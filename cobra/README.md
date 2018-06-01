@@ -63,6 +63,71 @@ with `go run main.go help serve`, etc. would all work.
 Obviously you haven't added your own code to these yet. The commands are ready
 for you to give them their tasks. Have fun!
 
+### cobra gen
+
+Once an application is initialized, Cobra can generate commands for you using `YAML` spec.
+```bash
+$ cobra gen -f ../spec.yaml
+```
+An example yaml spec is shown below defining two commands, `cmdA` and `cmdB`, with `cmdB` being
+a subcommand of `cmdA`. Both commands have a few flags:
+```yaml
+- name: cmdA
+  short: runs cmdA
+  long: this is long description for command A
+  func: MyFuncForCmdA
+  flags:
+  - type: str
+    short: a
+    long: str1
+    use: str flag
+  - type: str
+    short: b
+    long: str2
+    use: str flag
+  - type: bool
+    short: c
+    long: bool1
+    use: bool flag
+  - type: bool
+    short: d
+    long: bool2
+    use: bool flag
+  - type: bool
+    short: e
+    long: bool3
+    use: bool flag
+  subcmd:
+  - name: cmdB
+    short: runs command B
+    long: this is subcommand for cmd A
+    func: MyFuncForCmdB
+    flags:
+    - type: int
+      short: f
+      long: int1
+      use: int flag
+    - type: int
+      short: g
+      long: int2
+      use: int flag
+    - type: bool
+      short: h
+      long: bool4
+      use: bool flag
+    - type: bool
+      short: i
+      long: bool5
+      use: bool flag
+    - type: bool
+      short: j
+      long: bool6
+      use: bool flag
+    subcmd: []
+```
+
+Current support is only for `int`, `str` and `bool` flags.
+
 ### Configuring the cobra generator
 
 The Cobra generator will be easier to use if you provide a simple configuration
