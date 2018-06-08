@@ -47,7 +47,7 @@ produces boilerplate code for CLI.`,
 		// iterate over commands and add these commands
 		for _, command := range commands {
 			command := command
-			add("", command)
+			add("", "/", command)
 		}
 		return nil
 	},
@@ -58,7 +58,7 @@ func init() {
 	genCmd.Flags().StringVarP(&yamlSpecFile, "file", "f", "", "YAML spec file path")
 }
 
-func add(parent string, cmd *cmdSpec) {
+func add(parent, keyPath string, cmd *cmdSpec) {
 	if cmd == nil {
 		return
 	}
@@ -76,63 +76,155 @@ func add(parent string, cmd *cmdSpec) {
 
 	cmdName := validateCmdName(cmd.Name)
 	cmdPath := filepath.Join(project.CmdPath(), cmdName+".go")
-	createCmdFileWithAdditionalData(project.License(), cmdPath, parent, cmd)
+	createCmdFileWithAdditionalData(project.License(), cmdPath, parent, keyPath, cmd)
 
 	fmt.Fprintln((&cobra.Command{}).OutOrStdout(), cmdName, "created at", cmdPath)
 
 	for _, subCmd := range cmd.SubCmd {
 		subCmd := subCmd
-		add(cmd.Name+"Cmd", subCmd)
+		add(cmd.Name+"Cmd", filepath.Join(keyPath, cmd.Name), subCmd)
 	}
 }
 
-func createCmdFileWithAdditionalData(license License, path, parent string, cmd *cmdSpec) {
+func createCmdFileWithAdditionalData(license License, path, parent, keyPath string, cmd *cmdSpec) {
 	template := `{{comment .copyright}}
 {{if .license}}{{comment .license}}{{end}}
 
+// this file is auto-generated. Please DO NOT EDIT
+
+// package {{.cmdPackage}} has CLI command implementations
 package {{.cmdPackage}}
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/portworx/porx/px/cli/cflags"
 )
 
-// {{.cmdName}}Cmd represents the {{.cmdName}} command
-var {{.cmdName}}Cmd = &cobra.Command{
+// all content below this line is auto-generated. Please DO NOT EDIT
+
+// {{.cmdVarName}}Cmd represents the {{.cmdName}} command
+var {{.cmdVarName}}Cmd = &cobra.Command{
 	Use:   "{{.cmdName}}",
 	Short: "{{.short}}",
 	Long: ` + "`" + `{{.long}}` + "`" + `,
-	{{ if ne .func "" }}Run: {{.func}},{{ end }}
+	RunE: {{.cmdVarName}}Func,
 }
 
-{{ if ne .func "" }}
-func {{.func}}(cmd *cobra.Command, args []string) {
-		fmt.Println("{{.cmdName}} called")
+func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
+	{{ range $key, $value := .boolFlags -}}
+		{{- if eq $value.Persistent true -}}
+			vp.BindPFlag("{{$.keyPath}}/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/persistent/{{$value.Name}}", false);
+		{{- else -}}
+			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", false);
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .strFlags -}}
+		{{- if eq $value.Persistent true -}}
+			vp.BindPFlag("{{$.keyPath}}/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/persistent/{{$value.Name}}", "{{$value.Default}}");
+		{{- else -}}
+			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", "{{$value.Default}}");
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .intFlags -}}
+		{{- if eq $value.Persistent true -}}
+			vp.BindPFlag("{{$.keyPath}}/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/persistent/{{$value.Name}}", {{$value.Default}});
+		{{- else -}}
+			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
+		{{- end }}
+	{{- end }}
+
+		provider, err := cflags.NewViperProvider(vp, "{{$.keyPath}}/local")
+		if err != nil {
+			return err
+		}
+		
+		{{ if eq .func "" -}}
+			_ = provider
+			// enter your exec func here
+			// return yourExecFunc(provider)
+			fmt.Println("{{.cmdName}} called")
+			return nil
+		{{- else -}}
+			return {{.func}}(provider)
+		{{- end }}
 }
-{{ end }}
 
 func init() {
-	{{.parentName}}.AddCommand({{.cmdName}}Cmd)
+	{{.parentName}}.AddCommand({{.cmdVarName}}Cmd)
 
-	// Here you will define your flags and configuration settings.
+	// these flags are auto-generated, please DO NOT EDIT
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// {{.cmdName}}Cmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// {{.cmdName}}Cmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	{{ range $key, $value := .boolFlags }}
-	{{$.cmdName}}Cmd.Flags().BoolP("{{$value.Long}}", "{{$value.Short}}", false, "{{$value.Use}}")
-	{{ end }}
-	{{ range $key, $value := .strFlags }}
-	{{$.cmdName}}Cmd.Flags().StringP("{{$value.Long}}", "{{$value.Short}}", "", "{{$value.Use}}")
-	{{ end }}
-	{{ range $key, $value := .intFlags }}
-	{{$.cmdName}}Cmd.Flags().IntP("{{$value.Long}}", "{{$value.Short}}", 0, "{{$value.Use}}")
-	{{ end }}
+	{{ range $key, $value := .boolFlags -}}
+		{{- if eq $value.Persistent true -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().Bool("{{$value.Name}}", false, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().BoolP("{{$value.Name}}", "{{$value.Short}}", false, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- else -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.Flags().Bool("{{$value.Name}}", false, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.Flags().BoolP("{{$value.Name}}", "{{$value.Short}}", false, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .strFlags -}}
+		{{- if eq $value.Persistent true -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().String("{{$value.Name}}", "", "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().StringP("{{$value.Name}}", "{{$value.Short}}", "", "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- else -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.Flags().String("{{$value.Name}}", "", "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.Flags().StringP("{{$value.Name}}", "{{$value.Short}}", "", "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .intFlags -}}
+		{{- if eq $value.Persistent true -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().Int("{{$value.Name}}", 0, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().IntP("{{$value.Name}}", "{{$value.Short}}", 0, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- else -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.Flags().Int("{{$value.Name}}", 0, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.Flags().IntP("{{$value.Name}}", "{{$value.Short}}", 0, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- end }}
+	{{- end }}
 }
 `
 
@@ -146,6 +238,7 @@ func init() {
 		data["parentName"] = parent
 	}
 	data["cmdName"] = cmd.Name
+	data["cmdVarName"] = validateCmdName(cmd.Name)
 	data["short"] = cmd.Short
 	data["long"] = cmd.Long
 	data["func"] = cmd.Func
@@ -178,6 +271,11 @@ to quickly create a Cobra application.`
 		}
 	}
 
+	if keyPath != "/" {
+		data["keyPath"] = keyPath
+	} else {
+		data["keyPath"] = ""
+	}
 	data["boolFlags"] = boolFlags
 	data["intFlags"] = intFlags
 	data["strFlags"] = strFlags

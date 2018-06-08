@@ -7,10 +7,13 @@ const (
 )
 
 type flagSpec struct {
-	Type  string
-	Short string
-	Long  string
-	Use   string
+	Type       string
+	Short      string
+	Name       string
+	Use        string
+	Default    string
+	Hidden     bool
+	Persistent bool
 }
 
 type cmdSpec struct {
