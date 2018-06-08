@@ -99,6 +99,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/portworx/porx/px/cli/cflags"
+	{{ if ne .imports "" }}"{{.imports}}"{{ end }}
 )
 
 // all content below this line is auto-generated. Please DO NOT EDIT
@@ -108,6 +109,8 @@ var {{.cmdVarName}}Cmd = &cobra.Command{
 	Use:   "{{.cmdName}}",
 	Short: "{{.short}}",
 	Long: ` + "`" + `{{.long}}` + "`" + `,
+	Aliases: []string{ {{ range $key, $value := .aliases }}"{{ $value }}",{{ end }} },
+	Hidden: {{.hidden}},
 	RunE: {{.cmdVarName}}Func,
 }
 
@@ -242,6 +245,9 @@ func init() {
 	data["short"] = cmd.Short
 	data["long"] = cmd.Long
 	data["func"] = cmd.Func
+	data["imports"] = cmd.Imports
+	data["aliases"] = cmd.Aliases
+	data["hidden"] = cmd.Hidden
 
 	if data["short"] == "" {
 		data["short"] = "A brief description of your command"

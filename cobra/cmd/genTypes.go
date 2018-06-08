@@ -17,12 +17,15 @@ type flagSpec struct {
 }
 
 type cmdSpec struct {
-	Name   string
-	Short  string
-	Long   string
-	Func   string
-	Flags  []*flagSpec
-	SubCmd []*cmdSpec
+	Name    string
+	Short   string
+	Long    string
+	Func    string
+	Imports string
+	Aliases []string
+	Hidden  bool
+	Flags   []*flagSpec
+	SubCmd  []*cmdSpec
 }
 
 var (
