@@ -143,7 +143,7 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 		{{- end }}
 	{{- end }}
 
-		provider, err := cflags.NewViperProvider(vp, "{{$.keyPath}}/local")
+		provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/local")
 		if err != nil {
 			return err
 		}
