@@ -1,9 +1,12 @@
 package cmd
 
 const (
-	FlagBool = "bool"
-	FlagStr  = "str"
-	FlagInt  = "int"
+	FlagBool     = "bool"
+	FlagStr      = "str"
+	FlagInt      = "int"
+	FlagUint     = "uint"
+	FlagStrSlice = "str-slice"
+	FlagIntSlice = "int-slice"
 )
 
 type flagSpec struct {

@@ -21,6 +21,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"strconv"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -47,7 +50,9 @@ produces boilerplate code for CLI.`,
 		// iterate over commands and add these commands
 		for _, command := range commands {
 			command := command
-			add("", "/", command)
+			if err := add("", "/", command); err != nil {
+				return err
+			}
 		}
 		return nil
 	},
@@ -58,9 +63,9 @@ func init() {
 	genCmd.Flags().StringVarP(&yamlSpecFile, "file", "f", "", "YAML spec file path")
 }
 
-func add(parent, keyPath string, cmd *cmdSpec) {
+func add(parent, keyPath string, cmd *cmdSpec) error {
 	if cmd == nil {
-		return
+		return nil
 	}
 
 	var project *Project
@@ -76,17 +81,22 @@ func add(parent, keyPath string, cmd *cmdSpec) {
 
 	cmdName := validateCmdName(cmd.Name)
 	cmdPath := filepath.Join(project.CmdPath(), cmdName+".go")
-	createCmdFileWithAdditionalData(project.License(), cmdPath, parent, keyPath, cmd)
+	if err := createCmdFileWithAdditionalData(project.License(), cmdPath, parent, keyPath, cmd); err != nil {
+		return err
+	}
 
 	fmt.Fprintln((&cobra.Command{}).OutOrStdout(), cmdName, "created at", cmdPath)
 
 	for _, subCmd := range cmd.SubCmd {
 		subCmd := subCmd
-		add(cmd.Name+"Cmd", filepath.Join(keyPath, cmd.Name), subCmd)
+		if err := add(cmd.Name+"Cmd", filepath.Join(keyPath, cmd.Name), subCmd); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func createCmdFileWithAdditionalData(license License, path, parent, keyPath string, cmd *cmdSpec) {
+func createCmdFileWithAdditionalData(license License, path, parent, keyPath string, cmd *cmdSpec) error {
 	template := `{{comment .copyright}}
 {{if .license}}{{comment .license}}{{end}}
 
@@ -117,17 +127,17 @@ var {{.cmdVarName}}Cmd = &cobra.Command{
 func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 	{{ range $key, $value := .boolFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("{{$.keyPath}}/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/persistent/{{$value.Name}}", false);
+			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", false);
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("{{$.keyPath}}/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/persistent/{{$value.Name}}", "{{$value.Default}}");
+			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("/persistent/{{$value.Name}}", "{{$value.Default}}");
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", "{{$value.Default}}");
@@ -135,11 +145,38 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 	{{- end }}
 	{{- range $key, $value := .intFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("{{$.keyPath}}/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/persistent/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .uintFlags -}}
+		{{- if eq $value.Persistent true -}}
+			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
+		{{- else -}}
+			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .strSliceFlags -}}
+		{{- if eq $value.Persistent true -}}
+			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("/persistent/{{$value.Name}}", nil);
+		{{- else -}}
+			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", nil);
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .intSliceFlags -}}
+		{{- if eq $value.Persistent true -}}
+			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("/persistent/{{$value.Name}}", nil);
+		{{- else -}}
+			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
 
@@ -168,18 +205,18 @@ func init() {
 	{{ range $key, $value := .boolFlags -}}
 		{{- if eq $value.Persistent true -}}
 			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().Bool("{{$value.Name}}", false, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.PersistentFlags().Bool("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().BoolP("{{$value.Name}}", "{{$value.Short}}", false, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.PersistentFlags().BoolP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- end }}
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().Bool("{{$value.Name}}", false, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.Flags().Bool("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().BoolP("{{$value.Name}}", "{{$value.Short}}", false, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.Flags().BoolP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- end }}
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
@@ -189,18 +226,18 @@ func init() {
 	{{- range $key, $value := .strFlags -}}
 		{{- if eq $value.Persistent true -}}
 			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().String("{{$value.Name}}", "", "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.PersistentFlags().String("{{$value.Name}}", "{{$value.Default}}", "{{$value.Use}}");
 			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().StringP("{{$value.Name}}", "{{$value.Short}}", "", "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.PersistentFlags().StringP("{{$value.Name}}", "{{$value.Short}}", "{{$value.Default}}", "{{$value.Use}}");
 			{{- end }}
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().String("{{$value.Name}}", "", "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.Flags().String("{{$value.Name}}", "{{$value.Default}}", "{{$value.Use}}");
 			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().StringP("{{$value.Name}}", "{{$value.Short}}", "", "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.Flags().StringP("{{$value.Name}}", "{{$value.Short}}", "{{$value.Default}}", "{{$value.Use}}");
 			{{- end }}
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
@@ -210,18 +247,81 @@ func init() {
 	{{- range $key, $value := .intFlags -}}
 		{{- if eq $value.Persistent true -}}
 			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().Int("{{$value.Name}}", 0, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.PersistentFlags().Int("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().IntP("{{$value.Name}}", "{{$value.Short}}", 0, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.PersistentFlags().IntP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- end }}
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().Int("{{$value.Name}}", 0, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.Flags().Int("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
 			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().IntP("{{$value.Name}}", "{{$value.Short}}", 0, "{{$value.Use}}");
+				{{$.cmdVarName}}Cmd.Flags().IntP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .uintFlags -}}
+		{{- if eq $value.Persistent true -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().Uint("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().UintP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- else -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.Flags().Uint("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.Flags().UintP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .strSliceFlags -}}
+		{{- if eq $value.Persistent true -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().StringSlice("{{$value.Name}}", nil, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().StringSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- else -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.Flags().StringSlice("{{$value.Name}}", nil, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.Flags().StringSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- end }}
+	{{- end }}
+	{{- range $key, $value := .intSliceFlags -}}
+		{{- if eq $value.Persistent true -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().IntSlice("{{$value.Name}}", nil, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().IntSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
+			{{- end }}
+			{{- if eq $value.Hidden true -}}
+				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
+			{{- end }}
+		{{- else -}}
+			{{- if eq $value.Short "" -}}
+				{{$.cmdVarName}}Cmd.Flags().IntSlice("{{$value.Name}}", nil, "{{$value.Use}}");
+			{{- else -}}
+				{{$.cmdVarName}}Cmd.Flags().IntSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
 			{{- end }}
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
@@ -265,15 +365,51 @@ to quickly create a Cobra application.`
 	boolFlags := make([]*flagSpec, 0, 0)
 	strFlags := make([]*flagSpec, 0, 0)
 	intFlags := make([]*flagSpec, 0, 0)
+	uintFlags := make([]*flagSpec, 0, 0)
+	strSliceFlags := make([]*flagSpec, 0, 0)
+	intSliceFlag := make([]*flagSpec, 0, 0)
 	for _, flag := range cmd.Flags {
 		flag := flag
 		switch flag.Type {
 		case FlagBool:
+			if flag.Default == "" {
+				flag.Default = "false"
+			} else {
+				switch strings.ToLower(flag.Default) {
+				case "false":
+					flag.Default = "false"
+				case "true":
+					flag.Default = "true"
+				default:
+					return fmt.Errorf("error parsing YAML, invalid default value for bool type %s", flag.Name)
+				}
+			}
 			boolFlags = append(boolFlags, flag)
 		case FlagStr:
 			strFlags = append(strFlags, flag)
 		case FlagInt:
+			if _, err := strconv.ParseInt(flag.Default, 10, 32); err != nil {
+				return fmt.Errorf("error parsing YAML, invalid default value for int type %s", flag.Name)
+			}
 			intFlags = append(intFlags, flag)
+		case FlagUint:
+			if _, err := strconv.ParseUint(flag.Default, 10, 32); err != nil {
+				return fmt.Errorf("error parsing YAML, invalid default value for uint type %s", flag.Name)
+			}
+			uintFlags = append(uintFlags, flag)
+		case FlagStrSlice:
+			if flag.Default != "" {
+				return fmt.Errorf("error parsing YAML, default value not supported for string slice type %s", flag.Name)
+			}
+			strSliceFlags = append(strSliceFlags, flag)
+		case FlagIntSlice:
+			if flag.Default != "" {
+				return fmt.Errorf("error parsing YAML, default value not supported for int slice type %s", flag.Name)
+			}
+			intSliceFlag = append(intSliceFlag, flag)
+		default:
+			return fmt.Errorf("invalid flag type. Valid types: %s, %s, %s, %s, %s",
+				FlagBool, FlagStr, FlagInt, FlagStrSlice, FlagIntSlice)
 		}
 	}
 
@@ -282,9 +418,13 @@ to quickly create a Cobra application.`
 	} else {
 		data["keyPath"] = ""
 	}
+
 	data["boolFlags"] = boolFlags
 	data["intFlags"] = intFlags
+	data["uintFlags"] = uintFlags
 	data["strFlags"] = strFlags
+	data["strSliceFlag"] = strSliceFlags
+	data["intSliceFlag"] = intSliceFlag
 
 	cmdScript, err := executeTemplate(template, data)
 	if err != nil {
@@ -294,4 +434,5 @@ to quickly create a Cobra application.`
 	if err != nil {
 		er(err)
 	}
+	return nil
 }
