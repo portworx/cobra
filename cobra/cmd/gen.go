@@ -29,11 +29,23 @@ import (
 )
 
 var (
+	// cmdNames is a bookkeeping map to keep track of names that might be already in use.
+	// Such collisions need to be prevented for uniqueness of filenames.
 	cmdNames map[string]bool
-	buf      bytes.Buffer
-	bw       *bufio.Writer
-	buf2     bytes.Buffer
-	bw2      *bufio.Writer
+
+	// commandBuffer stores exec command stubs that get dumped in cli package for the
+	// commands that do not have a valid action listed against them
+	commandBuffer bytes.Buffer
+
+	// commandWriter wraps commandBuffer
+	commandWriter *bufio.Writer
+
+	// symbolBuffer stores symbol table for use in conjunction with cflags.Provider interface.
+	// It dumps symbol table that provide a way to lookup flagnames during access.
+	symbolBuffer bytes.Buffer
+
+	// symbolWriter wraps symbolBuffer
+	symbolWriter *bufio.Writer
 )
 
 // genCmd represents the gen command
@@ -63,38 +75,56 @@ produces boilerplate code for CLI.`,
 			}
 		}
 
-		bw.Flush()
-		bw2.Flush()
+		commandWriter.Flush()
+		symbolWriter.Flush()
 		f := make(map[string]interface{})
-		f["functions"] = string(buf.Bytes())
-		f["constants"] = string(buf2.Bytes())
-		t := `
-package cli
+		f["functions"] = string(commandBuffer.Bytes())
+		f["constants"] = string(symbolBuffer.Bytes())
 
-const (
-{{.constants}}
-)
-{{.functions}}`
-		cmdScript, err := executeTemplate(t, f)
-		if err != nil {
+		if t, err := ioutil.ReadFile("templates/pxFunctions.tmpl"); err != nil {
 			return err
+		} else {
+			if b, err := executeTemplate(string(t), f); err != nil {
+				return err
+			} else {
+				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "exec.go")
+				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
+					return err
+				}
+			}
 		}
 
-		execFileName := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "cobraExec.go")
-		return ioutil.WriteFile(execFileName, []byte(cmdScript), 0644)
+		if t, err := ioutil.ReadFile("templates/pxSymbols.tmpl"); err != nil {
+			return err
+		} else {
+			if b, err := executeTemplate(string(t), f); err != nil {
+				return err
+			} else {
+				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "symbols.go")
+				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
 	},
 }
 
 func init() {
+	// initialize global vars
 	cmdNames = make(map[string]bool)
-	bw = bufio.NewWriter(&buf)
-	bw2 = bufio.NewWriter(&buf2)
+	commandWriter = bufio.NewWriter(&commandBuffer)
+	symbolWriter = bufio.NewWriter(&symbolBuffer)
 
 	rootCmd.AddCommand(genCmd)
 	genCmd.Flags().StringVarP(&yamlSpecFile, "file", "f", "", "YAML spec file path")
 }
 
+// add is a recursive func that sifts through YAML spec and generates one go file per command.
+// All commands are dumped in the same folder. Nesting of commands is handled by linking pointers.
 func add(parent, keyPath string, cmd *cmdSpec) error {
+	// recursion exits on nil
 	if cmd == nil {
 		return nil
 	}
@@ -112,6 +142,7 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 
 	cmdName := validateCmdName(cmd.Name)
 	commandName := cmdName
+	// loop till we find a command name that is not taken
 	for i := 0; ; i++ {
 		if _, ok := cmdNames[commandName]; !ok {
 			break
@@ -120,10 +151,14 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 		}
 	}
 	cmdName = commandName
+
+	// make entry of this command name so future command names could be checked
 	cmdNames[cmdName] = true
+
+	// use the generated name as varName for this command
 	cmd.varName = cmdName
 
-	cmdPath := filepath.Join(project.CmdPath(), cmdName+".go")
+	cmdPath := filepath.Join(project.CmdPath(), "auto_"+cmdName+".go")
 	if err := os.RemoveAll(cmdPath); err != nil {
 		return err
 	}
@@ -134,6 +169,7 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 
 	fmt.Fprintln((&cobra.Command{}).OutOrStdout(), cmdName, "created at", cmdPath)
 
+	// run recursion for subcommands
 	for _, subCmd := range cmd.SubCmd {
 		subCmd := subCmd
 		if err := add(cmd.varName+"Cmd", filepath.Join(keyPath, cmd.Name), subCmd); err != nil {
@@ -144,274 +180,36 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 }
 
 func createCmdFileWithAdditionalData(license License, path, parent, keyPath string, cmd *cmdSpec) error {
-	template := `{{comment .copyright}}
-{{if .license}}{{comment .license}}{{end}}
-
-// this file is auto-generated. Please DO NOT EDIT
-
-// package {{.cmdPackage}} has CLI command implementations
-package {{.cmdPackage}}
-
-import (
-	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/portworx/porx/px/cli/cflags"
-	{{ if ne .imports "" }}"{{.imports}}"{{ end }}
-)
-
-// all content below this line is auto-generated. Please DO NOT EDIT
-
-// {{.cmdVarName}}Cmd represents the {{.cmdName}} command
-var {{.cmdVarName}}Cmd = &cobra.Command{
-	Use:   "{{.cmdName}}",
-	Short: "{{.short}}",
-	Long: ` + "`" + `{{.long}}` + "`" + `,
-	Aliases: []string{ {{ range $key, $value := .aliases }}"{{ $value }}",{{ end }} },
-	Hidden: {{.hidden}},
-	RunE: {{.localFunc}},
-}
-
-func {{.localFunc}}(cmd *cobra.Command, args []string) error {
-	{{ range $key, $value := .boolFlags -}}
-		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
-		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .strFlags -}}
-		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("/persistent/{{$value.Name}}", "{{$value.Default}}");
-		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", "{{$value.Default}}");
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .intFlags -}}
-		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
-		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .uintFlags -}}
-		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
-		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .strSliceFlags -}}
-		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("/persistent/{{$value.Name}}", nil);
-		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .intSliceFlags -}}
-		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("/persistent/{{$value.Name}}", nil);
-		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
-		{{- end }}
-	{{- end }}
-
-		provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")
-		if err != nil {
-			return err
-		}
-		
-		{{ if eq .func "" -}}
-			_ = provider
-			// enter your exec func here
-			// return yourExecFunc(provider)
-			fmt.Println("{{.cmdName}} called")
-			return nil
-		{{- else -}}
-			return {{.func}}(provider)
-		{{- end }}
-}
-
-func init() {
-	{{.parentName}}.AddCommand({{.cmdVarName}}Cmd)
-
-	// these flags are auto-generated, please DO NOT EDIT
-
-
-	{{ range $key, $value := .boolFlags -}}
-		{{- if eq $value.Persistent true -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().Bool("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().BoolP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- else -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().Bool("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().BoolP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .strFlags -}}
-		{{- if eq $value.Persistent true -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().String("{{$value.Name}}", "{{$value.Default}}", "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().StringP("{{$value.Name}}", "{{$value.Short}}", "{{$value.Default}}", "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- else -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().String("{{$value.Name}}", "{{$value.Default}}", "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().StringP("{{$value.Name}}", "{{$value.Short}}", "{{$value.Default}}", "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .intFlags -}}
-		{{- if eq $value.Persistent true -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().Int("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().IntP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- else -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().Int("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().IntP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .uintFlags -}}
-		{{- if eq $value.Persistent true -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().Uint("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().UintP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- else -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().Uint("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().UintP("{{$value.Name}}", "{{$value.Short}}", {{$value.Default}}, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .strSliceFlags -}}
-		{{- if eq $value.Persistent true -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().StringSlice("{{$value.Name}}", nil, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().StringSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- else -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().StringSlice("{{$value.Name}}", nil, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().StringSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- end }}
-	{{- end }}
-	{{- range $key, $value := .intSliceFlags -}}
-		{{- if eq $value.Persistent true -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().IntSlice("{{$value.Name}}", nil, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().IntSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- else -}}
-			{{- if eq $value.Short "" -}}
-				{{$.cmdVarName}}Cmd.Flags().IntSlice("{{$value.Name}}", nil, "{{$value.Use}}");
-			{{- else -}}
-				{{$.cmdVarName}}Cmd.Flags().IntSliceP("{{$value.Name}}", "{{$value.Short}}", nil, "{{$value.Use}}");
-			{{- end }}
-			{{- if eq $value.Hidden true -}}
-				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
-			{{- end }}
-		{{- end }}
-	{{- end }}
-}
-`
-
-	templateExecFunc := `
-func {{.funcInCli}}(provider cflags.Provider) error {
-	return nil
-}
-`
-
 	data := make(map[string]interface{})
-	data["copyright"] = copyrightLine()
-	data["license"] = license.Header
-	data["cmdPackage"] = filepath.Base(filepath.Dir(path)) // last dir of path
+
+	// parent is the var name of the parent command struct to link against.
+	// there is always a parent available.
 	if parent == "" {
+		// if empty string is passed, it implies we need to link against "root"
 		data["parentName"] = parentName
 	} else {
 		data["parentName"] = parent
 	}
+
+	data["copyright"] = copyrightLine()
+	data["license"] = license.Header
+	data["cmdPackage"] = filepath.Base(filepath.Dir(path)) // last dir of path
 	data["cmdName"] = cmd.Name
 	data["cmdVarName"] = cmd.varName
-	data["short"] = cmd.Short
-	data["long"] = cmd.Long
 	data["imports"] = cmd.Imports
 	data["aliases"] = cmd.Aliases
 	data["hidden"] = cmd.Hidden
 
-	if data["short"] == "" {
-		data["short"] = "A brief description of your command"
+	if cmd.Short == "" {
+		data["short"] = cmd.Name
+	} else {
+		data["short"] = cmd.Short
 	}
 
-	if data["long"] == "" {
-		data["long"] = `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`
+	if cmd.Long == "" {
+		data["long"] = cmd.Name
+	} else {
+		data["long"] = cmd.Long
 	}
 
 	if keyPath != "/" {
@@ -434,9 +232,9 @@ to quickly create a Cobra application.`
 			}
 		}
 	}
-	data["func"] = "cli.E" + execFunc + firstLetterCaps(cmd.Name)
-	data["funcInCli"] = "E" + execFunc + firstLetterCaps(cmd.Name)
-	data["localFunc"] = "e" + execFunc + firstLetterCaps(cmd.Name)
+	data["func"] = "cli.E" + execFunc + formatInput(cmd.Name)
+	data["funcInCli"] = "E" + execFunc + formatInput(cmd.Name)
+	data["localFunc"] = "e" + execFunc + formatInput(cmd.Name)
 
 	if len(cmd.Func) > 0 {
 		data["func"] = cmd.Func
@@ -452,8 +250,8 @@ to quickly create a Cobra application.`
 		flag := flag
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
 			strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
-			firstLetterCaps(flag.Name), flag.Name)
-		bw2.Write([]byte(s))
+			formatInput(flag.Name), flag.Name)
+		symbolWriter.Write([]byte(s))
 		switch flag.Type {
 		case FlagBool:
 			if flag.Default == "" {
@@ -504,25 +302,37 @@ to quickly create a Cobra application.`
 	data["strSliceFlag"] = strSliceFlags
 	data["intSliceFlag"] = intSliceFlag
 
-	cmdScript, err := executeTemplate(template, data)
-	if err != nil {
-		er(err)
-	}
-	err = writeStringToFile(path, cmdScript)
-	if err != nil {
-		er(err)
+	// dump a go file for new command
+	if t, err := ioutil.ReadFile("templates/pxCommand.tmpl"); err != nil {
+		return err
+	} else {
+		if b, err := executeTemplate(string(t), data); err != nil {
+			er(err)
+		} else {
+			if err = writeStringToFile(path, b); err != nil {
+				er(err)
+			}
+		}
 	}
 
-	cmdScript, err = executeTemplate(templateExecFunc, data)
-	if err != nil {
-		er(err)
+	// dump a stub for exec func if user does not provide one in YAML
+	if len(cmd.Func) == 0 {
+		if t, err := ioutil.ReadFile("templates/pxFunction.tmpl"); err != nil {
+			return err
+		} else {
+			if b, err := executeTemplate(string(t), data); err != nil {
+				er(err)
+			} else {
+				commandWriter.Write([]byte(b))
+			}
+		}
 	}
 
-	bw.Write([]byte(cmdScript))
 	return nil
 }
 
-func firstLetterCaps(x string) string {
+// formatInput is a helper func
+func formatInput(x string) string {
 	if len(x) == 0 {
 		return x
 	}
