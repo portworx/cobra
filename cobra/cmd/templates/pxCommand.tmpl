@@ -19,7 +19,7 @@ import (
 var {{.cmdVarName}}Cmd = &cobra.Command{
 	Use:   "{{.cmdName}}",
 	Short: "{{.short}}",
-	Long: ` + "`" + `{{.long}}` + "`" + `,
+	Long: `{{.long}}`,
 	Aliases: []string{ {{ range $key, $value := .aliases }}"{{ $value }}",{{ end }} },
 	Hidden: {{.hidden}},
 	RunE: {{.localFunc}},
