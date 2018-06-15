@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"log"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -33,22 +35,26 @@ var (
 	// Such collisions need to be prevented for uniqueness of filenames.
 	cmdNames map[string]bool
 
+	// execFolder is the path of dir where this executable is running.
+	// It is used to locate template files relative to this path.
+	execFolder string
+
 	// commandBuffer stores exec command stubs that get dumped in cli package for the
-	// commands that do not have a valid action listed against them
+	// commands that do not have a valid action listed against them.
 	commandBuffer bytes.Buffer
 
-	// commandWriter wraps commandBuffer
+	// commandWriter wraps commandBuffer.
 	commandWriter *bufio.Writer
 
 	// symbolBuffer stores symbol table for use in conjunction with cflags.Provider interface.
 	// It dumps symbol table that provide a way to lookup flagnames during access.
 	symbolBuffer bytes.Buffer
 
-	// symbolWriter wraps symbolBuffer
+	// symbolWriter wraps symbolBuffer.
 	symbolWriter *bufio.Writer
 )
 
-// genCmd represents the gen command
+// genCmd represents the gen command.
 var genCmd = &cobra.Command{
 	Use:   "gen",
 	Short: "auto-gen CLI using YAML spec",
@@ -81,7 +87,7 @@ produces boilerplate code for CLI.`,
 		f["functions"] = string(commandBuffer.Bytes())
 		f["constants"] = string(symbolBuffer.Bytes())
 
-		if t, err := ioutil.ReadFile("templates/pxFunctions.tmpl"); err != nil {
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunctions.tmpl")); err != nil {
 			return err
 		} else {
 			if b, err := executeTemplate(string(t), f); err != nil {
@@ -94,7 +100,7 @@ produces boilerplate code for CLI.`,
 			}
 		}
 
-		if t, err := ioutil.ReadFile("templates/pxSymbols.tmpl"); err != nil {
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxSymbols.tmpl")); err != nil {
 			return err
 		} else {
 			if b, err := executeTemplate(string(t), f); err != nil {
@@ -116,6 +122,13 @@ func init() {
 	cmdNames = make(map[string]bool)
 	commandWriter = bufio.NewWriter(&commandBuffer)
 	symbolWriter = bufio.NewWriter(&symbolBuffer)
+
+	// init executable path
+	if execPath, err := os.Executable(); err != nil {
+		log.Fatal(err)
+	} else {
+		execFolder, _ = filepath.Split(execPath)
+	}
 
 	rootCmd.AddCommand(genCmd)
 	genCmd.Flags().StringVarP(&yamlSpecFile, "file", "f", "", "YAML spec file path")
@@ -303,7 +316,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	data["intSliceFlag"] = intSliceFlag
 
 	// dump a go file for new command
-	if t, err := ioutil.ReadFile("templates/pxCommand.tmpl"); err != nil {
+	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxCommand.tmpl")); err != nil {
 		return err
 	} else {
 		if b, err := executeTemplate(string(t), data); err != nil {
@@ -317,7 +330,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 
 	// dump a stub for exec func if user does not provide one in YAML
 	if len(cmd.Func) == 0 {
-		if t, err := ioutil.ReadFile("templates/pxFunction.tmpl"); err != nil {
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunction.tmpl")); err != nil {
 			return err
 		} else {
 			if b, err := executeTemplate(string(t), data); err != nil {
