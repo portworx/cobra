@@ -15,17 +15,25 @@
 package cmd
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
-
 	"io/ioutil"
 	"os"
 	"path/filepath"
-
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
+)
+
+var (
+	cmdNames map[string]bool
+	buf      bytes.Buffer
+	bw       *bufio.Writer
+	buf2     bytes.Buffer
+	bw2      *bufio.Writer
 )
 
 // genCmd represents the gen command
@@ -54,11 +62,34 @@ produces boilerplate code for CLI.`,
 				return err
 			}
 		}
-		return nil
+
+		bw.Flush()
+		bw2.Flush()
+		f := make(map[string]interface{})
+		f["functions"] = string(buf.Bytes())
+		f["constants"] = string(buf2.Bytes())
+		t := `
+package cli
+
+const (
+{{.constants}}
+)
+{{.functions}}`
+		cmdScript, err := executeTemplate(t, f)
+		if err != nil {
+			return err
+		}
+
+		execFileName := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "cobraExec.go")
+		return ioutil.WriteFile(execFileName, []byte(cmdScript), 0644)
 	},
 }
 
 func init() {
+	cmdNames = make(map[string]bool)
+	bw = bufio.NewWriter(&buf)
+	bw2 = bufio.NewWriter(&buf2)
+
 	rootCmd.AddCommand(genCmd)
 	genCmd.Flags().StringVarP(&yamlSpecFile, "file", "f", "", "YAML spec file path")
 }
@@ -80,7 +111,23 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 	}
 
 	cmdName := validateCmdName(cmd.Name)
+	commandName := cmdName
+	for i := 0; ; i++ {
+		if _, ok := cmdNames[commandName]; !ok {
+			break
+		} else {
+			commandName = fmt.Sprintf("%s%d", cmdName, i)
+		}
+	}
+	cmdName = commandName
+	cmdNames[cmdName] = true
+	cmd.varName = cmdName
+
 	cmdPath := filepath.Join(project.CmdPath(), cmdName+".go")
+	if err := os.RemoveAll(cmdPath); err != nil {
+		return err
+	}
+
 	if err := createCmdFileWithAdditionalData(project.License(), cmdPath, parent, keyPath, cmd); err != nil {
 		return err
 	}
@@ -89,7 +136,7 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 
 	for _, subCmd := range cmd.SubCmd {
 		subCmd := subCmd
-		if err := add(cmd.Name+"Cmd", filepath.Join(keyPath, cmd.Name), subCmd); err != nil {
+		if err := add(cmd.varName+"Cmd", filepath.Join(keyPath, cmd.Name), subCmd); err != nil {
 			return err
 		}
 	}
@@ -121,17 +168,17 @@ var {{.cmdVarName}}Cmd = &cobra.Command{
 	Long: ` + "`" + `{{.long}}` + "`" + `,
 	Aliases: []string{ {{ range $key, $value := .aliases }}"{{ $value }}",{{ end }} },
 	Hidden: {{.hidden}},
-	RunE: {{.cmdVarName}}Func,
+	RunE: {{.localFunc}},
 }
 
-func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
+func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 	{{ range $key, $value := .boolFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strFlags -}}
@@ -139,8 +186,8 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("/persistent/{{$value.Name}}", "{{$value.Default}}");
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", "{{$value.Default}}");
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", "{{$value.Default}}");
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intFlags -}}
@@ -148,8 +195,8 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .uintFlags -}}
@@ -157,8 +204,8 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strSliceFlags -}}
@@ -166,8 +213,8 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("/persistent/{{$value.Name}}", nil);
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", nil);
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intSliceFlags -}}
@@ -175,12 +222,12 @@ func {{.cmdVarName}}Func(cmd *cobra.Command, args []string) error {
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
 			vp.SetDefault("/persistent/{{$value.Name}}", nil);
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.SetDefault("{{$.keyPath}}/local/{{$value.Name}}", nil);
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
 
-		provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/local")
+		provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")
 		if err != nil {
 			return err
 		}
@@ -331,6 +378,12 @@ func init() {
 }
 `
 
+	templateExecFunc := `
+func {{.funcInCli}}(provider cflags.Provider) error {
+	return nil
+}
+`
+
 	data := make(map[string]interface{})
 	data["copyright"] = copyrightLine()
 	data["license"] = license.Header
@@ -341,10 +394,9 @@ func init() {
 		data["parentName"] = parent
 	}
 	data["cmdName"] = cmd.Name
-	data["cmdVarName"] = validateCmdName(cmd.Name)
+	data["cmdVarName"] = cmd.varName
 	data["short"] = cmd.Short
 	data["long"] = cmd.Long
-	data["func"] = cmd.Func
 	data["imports"] = cmd.Imports
 	data["aliases"] = cmd.Aliases
 	data["hidden"] = cmd.Hidden
@@ -362,6 +414,34 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`
 	}
 
+	if keyPath != "/" {
+		data["keyPath"] = keyPath
+	} else {
+		data["keyPath"] = ""
+	}
+
+	keys := strings.Split(strings.Replace(data["keyPath"].(string), "/", "-", -1), "-")
+	execFunc := "xec"
+	for _, key := range keys {
+		key := strings.TrimSpace(key)
+		if len(key) > 0 {
+			if len(key) == 1 {
+				key = strings.ToUpper(string(key[0]))
+				execFunc = execFunc + key
+			} else {
+				key = strings.ToUpper(string(key[0])) + key[1:]
+				execFunc = execFunc + key
+			}
+		}
+	}
+	data["func"] = "cli.E" + execFunc + firstLetterCaps(cmd.Name)
+	data["funcInCli"] = "E" + execFunc + firstLetterCaps(cmd.Name)
+	data["localFunc"] = "e" + execFunc + firstLetterCaps(cmd.Name)
+
+	if len(cmd.Func) > 0 {
+		data["func"] = cmd.Func
+	}
+
 	boolFlags := make([]*flagSpec, 0, 0)
 	strFlags := make([]*flagSpec, 0, 0)
 	intFlags := make([]*flagSpec, 0, 0)
@@ -370,6 +450,10 @@ to quickly create a Cobra application.`
 	intSliceFlag := make([]*flagSpec, 0, 0)
 	for _, flag := range cmd.Flags {
 		flag := flag
+		s := fmt.Sprintf("%s%s = \"%s\"\n",
+			strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+			firstLetterCaps(flag.Name), flag.Name)
+		bw2.Write([]byte(s))
 		switch flag.Type {
 		case FlagBool:
 			if flag.Default == "" {
@@ -408,15 +492,9 @@ to quickly create a Cobra application.`
 			}
 			intSliceFlag = append(intSliceFlag, flag)
 		default:
-			return fmt.Errorf("invalid flag type. Valid types: %s, %s, %s, %s, %s",
-				FlagBool, FlagStr, FlagInt, FlagStrSlice, FlagIntSlice)
+			return fmt.Errorf("invalid flag type. Valid types: %s, %s, %s, %s, %s, %s",
+				FlagBool, FlagStr, FlagInt, FlagUint, FlagStrSlice, FlagIntSlice)
 		}
-	}
-
-	if keyPath != "/" {
-		data["keyPath"] = keyPath
-	} else {
-		data["keyPath"] = ""
 	}
 
 	data["boolFlags"] = boolFlags
@@ -434,5 +512,34 @@ to quickly create a Cobra application.`
 	if err != nil {
 		er(err)
 	}
+
+	cmdScript, err = executeTemplate(templateExecFunc, data)
+	if err != nil {
+		er(err)
+	}
+
+	bw.Write([]byte(cmdScript))
 	return nil
+}
+
+func firstLetterCaps(x string) string {
+	if len(x) == 0 {
+		return x
+	}
+
+	if len(x) == 1 {
+		return strings.ToUpper(x)
+	}
+
+	x = strings.Replace(x, "_", "-", -1)
+	out := ""
+	for _, key := range strings.Split(x, "-") {
+		if len(key) == 1 {
+			key = strings.ToUpper(key)
+		} else {
+			key = strings.ToUpper(string(key[0])) + key[1:]
+		}
+		out = out + key
+	}
+	return out
 }

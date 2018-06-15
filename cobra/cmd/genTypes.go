@@ -21,6 +21,7 @@ type flagSpec struct {
 
 type cmdSpec struct {
 	Name    string
+	varName string
 	Short   string
 	Long    string
 	Func    string
