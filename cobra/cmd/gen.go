@@ -93,7 +93,7 @@ produces boilerplate code for CLI.`,
 			if b, err := executeTemplate(string(t), f); err != nil {
 				return err
 			} else {
-				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "exec.go")
+				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "execNotImplemented.go")
 				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
 					return err
 				}

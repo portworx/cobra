@@ -81,6 +81,7 @@ func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 		{{- end }}
 	{{- end }}
 
+        vp.Set("args", args)
 		provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")
 		if err != nil {
 			return err
