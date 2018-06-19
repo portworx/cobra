@@ -73,6 +73,37 @@ produces boilerplate code for CLI.`,
 			return err
 		}
 
+		// remove all auto-generated files from command path
+		var project *Project
+		if packageName != "" {
+			project = NewProject(packageName)
+		} else {
+			wd, err := os.Getwd()
+			if err != nil {
+				er(err)
+			}
+			project = NewProjectFromPath(wd)
+		}
+		files, err := ioutil.ReadDir(project.CmdPath())
+		if err != nil {
+			return err
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+
+			fileName := file.Name()
+			if len(fileName) > 5 && fileName[:5] == "auto_" {
+				if err := os.RemoveAll(filepath.Join(project.CmdPath(), fileName)); err != nil {
+					return err
+				} else {
+					fmt.Println("removed:", filepath.Join(project.CmdPath(), fileName))
+				}
+			}
+		}
+
 		// iterate over commands and add these commands
 		for _, command := range commands {
 			command := command
@@ -172,10 +203,6 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 	cmd.varName = cmdName
 
 	cmdPath := filepath.Join(project.CmdPath(), "auto_"+cmdName+".go")
-	if err := os.RemoveAll(cmdPath); err != nil {
-		return err
-	}
-
 	if err := createCmdFileWithAdditionalData(project.License(), cmdPath, parent, keyPath, cmd); err != nil {
 		return err
 	}
@@ -245,9 +272,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			}
 		}
 	}
-	data["func"] = "cli.E" + execFunc + formatInput(cmd.Name)
-	data["funcInCli"] = "E" + execFunc + formatInput(cmd.Name)
-	data["localFunc"] = "e" + execFunc + formatInput(cmd.Name)
+	data["func"] = "cli.E" + execFunc + formatInputUp(cmd.Name)
+	data["funcInCli"] = "E" + execFunc + formatInputUp(cmd.Name)
+	data["localFunc"] = "e" + execFunc + formatInputUp(cmd.Name)
 
 	if len(cmd.Func) > 0 {
 		data["func"] = cmd.Func
@@ -258,12 +285,19 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	intFlags := make([]*flagSpec, 0, 0)
 	uintFlags := make([]*flagSpec, 0, 0)
 	strSliceFlags := make([]*flagSpec, 0, 0)
-	intSliceFlag := make([]*flagSpec, 0, 0)
+	intSliceFlags := make([]*flagSpec, 0, 0)
+
+	boolStubs := make([]*flagStub, 0, 0)
+	strStubs := make([]*flagStub, 0, 0)
+	intStubs := make([]*flagStub, 0, 0)
+	uintStubs := make([]*flagStub, 0, 0)
+	strSliceStubs := make([]*flagStub, 0, 0)
+	intSliceStubs := make([]*flagStub, 0, 0)
 	for _, flag := range cmd.Flags {
 		flag := flag
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
 			strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
-			formatInput(flag.Name), flag.Name)
+			formatInputUp(flag.Name), flag.Name)
 		symbolWriter.Write([]byte(s))
 		switch flag.Type {
 		case FlagBool:
@@ -280,28 +314,76 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				}
 			}
 			boolFlags = append(boolFlags, flag)
+			stub := new(flagStub)
+			stub.Type = FlagBool
+			stub.Name = formatInputLo(flag.Name)
+			stub.Persistent = flag.Persistent
+			stub.VarName = fmt.Sprintf("%s%s",
+				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+				formatInputUp(flag.Name))
+			boolStubs = append(boolStubs, stub)
 		case FlagStr:
 			strFlags = append(strFlags, flag)
+			stub := new(flagStub)
+			stub.Type = FlagStr
+			stub.Name = formatInputLo(flag.Name)
+			stub.Persistent = flag.Persistent
+			stub.VarName = fmt.Sprintf("%s%s",
+				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+				formatInputUp(flag.Name))
+			strStubs = append(strStubs, stub)
 		case FlagInt:
 			if _, err := strconv.ParseInt(flag.Default, 10, 32); err != nil {
 				return fmt.Errorf("error parsing YAML, invalid default value for int type %s", flag.Name)
 			}
 			intFlags = append(intFlags, flag)
+			stub := new(flagStub)
+			stub.Type = FlagInt
+			stub.Name = formatInputLo(flag.Name)
+			stub.Persistent = flag.Persistent
+			stub.VarName = fmt.Sprintf("%s%s",
+				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+				formatInputUp(flag.Name))
+			intStubs = append(intStubs, stub)
 		case FlagUint:
 			if _, err := strconv.ParseUint(flag.Default, 10, 32); err != nil {
 				return fmt.Errorf("error parsing YAML, invalid default value for uint type %s", flag.Name)
 			}
 			uintFlags = append(uintFlags, flag)
+			stub := new(flagStub)
+			stub.Type = FlagUint
+			stub.Name = formatInputLo(flag.Name)
+			stub.Persistent = flag.Persistent
+			stub.VarName = fmt.Sprintf("%s%s",
+				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+				formatInputUp(flag.Name))
+			uintStubs = append(uintStubs, stub)
 		case FlagStrSlice:
 			if flag.Default != "" {
 				return fmt.Errorf("error parsing YAML, default value not supported for string slice type %s", flag.Name)
 			}
 			strSliceFlags = append(strSliceFlags, flag)
+			stub := new(flagStub)
+			stub.Type = FlagStrSlice
+			stub.Name = formatInputLo(flag.Name)
+			stub.Persistent = flag.Persistent
+			stub.VarName = fmt.Sprintf("%s%s",
+				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+				formatInputUp(flag.Name))
+			strSliceStubs = append(strSliceStubs, stub)
 		case FlagIntSlice:
 			if flag.Default != "" {
 				return fmt.Errorf("error parsing YAML, default value not supported for int slice type %s", flag.Name)
 			}
-			intSliceFlag = append(intSliceFlag, flag)
+			intSliceFlags = append(intSliceFlags, flag)
+			stub := new(flagStub)
+			stub.Type = FlagIntSlice
+			stub.Name = formatInputLo(flag.Name)
+			stub.Persistent = flag.Persistent
+			stub.VarName = fmt.Sprintf("%s%s",
+				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
+				formatInputUp(flag.Name))
+			intSliceStubs = append(intSliceStubs, stub)
 		default:
 			return fmt.Errorf("invalid flag type. Valid types: %s, %s, %s, %s, %s, %s",
 				FlagBool, FlagStr, FlagInt, FlagUint, FlagStrSlice, FlagIntSlice)
@@ -312,8 +394,15 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	data["intFlags"] = intFlags
 	data["uintFlags"] = uintFlags
 	data["strFlags"] = strFlags
-	data["strSliceFlag"] = strSliceFlags
-	data["intSliceFlag"] = intSliceFlag
+	data["strSliceFlags"] = strSliceFlags
+	data["intSliceFlags"] = intSliceFlags
+
+	data["boolStubs"] = boolStubs
+	data["intStubs"] = intStubs
+	data["uintStubs"] = uintStubs
+	data["strStubs"] = strStubs
+	data["strSliceStubs"] = strSliceStubs
+	data["intSliceStubs"] = intSliceStubs
 
 	// dump a go file for new command
 	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxCommand.tmpl")); err != nil {
@@ -330,6 +419,16 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 
 	// dump a stub for exec func if user does not provide one in YAML
 	if len(cmd.Func) == 0 {
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFlag.tmpl")); err != nil {
+			return err
+		} else {
+			if b, err := executeTemplate(string(t), data); err != nil {
+				er(err)
+			} else {
+				data["flagStubs"] = b
+			}
+		}
+
 		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunction.tmpl")); err != nil {
 			return err
 		} else {
@@ -344,8 +443,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	return nil
 }
 
-// formatInput is a helper func
-func formatInput(x string) string {
+// formatInputUp is a helper func
+func formatInputUp(x string) string {
 	if len(x) == 0 {
 		return x
 	}
@@ -363,6 +462,35 @@ func formatInput(x string) string {
 			key = strings.ToUpper(string(key[0])) + key[1:]
 		}
 		out = out + key
+	}
+	return out
+}
+
+// formatInputLo is a helper func
+func formatInputLo(x string) string {
+	if len(x) == 0 {
+		return x
+	}
+
+	if len(x) == 1 {
+		return strings.ToLower(x)
+	}
+
+	x = strings.Replace(x, "_", "-", -1)
+	out := ""
+	for _, key := range strings.Split(x, "-") {
+		if len(key) == 1 {
+			key = strings.ToUpper(key)
+		} else {
+			key = strings.ToUpper(string(key[0])) + key[1:]
+		}
+		out = out + key
+	}
+
+	if len(out) == 1 {
+		out = strings.ToLower(out)
+	} else {
+		out = strings.ToLower(string(out[0])) + out[1:]
 	}
 	return out
 }

@@ -10,12 +10,19 @@ const (
 )
 
 type flagSpec struct {
+	Name       string
 	Type       string
 	Short      string
-	Name       string
 	Use        string
 	Default    string
 	Hidden     bool
+	Persistent bool
+}
+
+type flagStub struct {
+	Name       string
+	VarName    string
+	Type       string
 	Persistent bool
 }
 
