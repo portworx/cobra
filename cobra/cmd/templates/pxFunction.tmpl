@@ -1,11 +1,35 @@
+{{ if eq .inputInterface true -}}
+/*
 // {{.funcInCli}} function stub is auto-generated for you.
 // Please provide implementation of business logic here and
 // move this function to exec.go.
 // This file will get overwritten by cobra gen command.
 // Please also register this function in YAML spec file.
-// {{.funcInCli}} --- enter func doc here ---
+*/
+// {{.funcInCli}} {{.short}}
 func {{.funcInCli}}(provider cflags.Provider) error {
-    {{.flagStubs}}
     fmt.Println("{{.funcInCli}} is not implemented")
 	return nil
 }
+{{ else }}
+/*
+// {{.funcInCli}} function stub is auto-generated for you.
+// Please provide implementation of business logic here and
+// move this function to exec.go.
+// This file will get overwritten by cobra gen command.
+// Please also register this function in YAML spec file.
+*/
+// {{.funcInCli}} {{.short}}
+func {{.funcInCli}}(d *{{.localStruct}}) error {
+    if d == nil {
+        return FlagsNotValidated
+    }
+    fmt.Println("{{.funcInCli}} is not implemented")
+    if b, err := json.MarshalIndent(d, "", "  "); err != nil {
+        return err
+    } else {
+        fmt.Println(string(b))
+    }
+	return nil
+}
+{{- end }}

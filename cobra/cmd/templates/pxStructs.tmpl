@@ -1,0 +1,33 @@
+package cli
+
+// a type is defined for each CLI function in order to pass
+// flag values as a type safe transport mechanism.
+
+type Error string
+
+func (e Error) Error() string {
+	return string(e)
+}
+
+const (
+	FlagsNotValidated Error = "flags are not validated"
+)
+
+// This is an auto-generated file. Pl. DO NOT EDIT
+
+// FlagsGlobal aggregates global flags.
+// This is auto-generated. Pl. DO NOT EDIT
+type FlagsGlobal struct {
+    // global flags
+    Json bool
+	Raw bool
+	Color bool
+	Ssl bool
+	Ca string
+	Cert string
+	Key string
+	Host string
+	Port string
+}
+
+{{.structs}}

@@ -17,9 +17,11 @@ type flagSpec struct {
 	Default    string
 	Hidden     bool
 	Persistent bool
+	Func       string
 }
 
 type flagStub struct {
+	Key        string
 	Name       string
 	VarName    string
 	Type       string
@@ -27,16 +29,17 @@ type flagStub struct {
 }
 
 type cmdSpec struct {
-	Name    string
-	varName string
-	Short   string
-	Long    string
-	Func    string
-	Imports string
-	Aliases []string
-	Hidden  bool
-	Flags   []*flagSpec
-	SubCmd  []*cmdSpec
+	Name           string
+	varName        string
+	Short          string
+	Long           string
+	Func           string
+	InputInterface bool
+	Imports        string
+	Aliases        []string
+	Hidden         bool
+	Flags          []*flagSpec
+	SubCmd         []*cmdSpec
 }
 
 var (

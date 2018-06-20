@@ -1,0 +1,31 @@
+// {{.localStruct}} aggregates global and local flags for a command.
+// This is auto-generated. Pl. DO NOT EDIT
+type {{.localStruct}} struct {
+    // global flags
+    Global *FlagsGlobal
+	// args
+	Args []string
+	// local flags
+{{ range $key, $value := .boolStubs -}}
+        {{$value.Name}} bool;
+{{- end }}
+{{- range $key, $value := .strStubs -}}
+        {{$value.Name}} string;
+{{- end }}
+{{- range $key, $value := .intStubs -}}
+        {{$value.Name}} int;
+{{- end }}
+{{- range $key, $value := .uintStubs -}}
+        {{$value.Name}} uint;
+{{- end }}
+{{- range $key, $value := .strSliceStubs -}}
+        {{$value.Name}} []string;
+{{- end }}
+{{- range $key, $value := .intSliceStubs -}}
+        {{$value.Name}} []int;
+{{- end }}
+};
+
+func (t *{{.localStruct}}) GetGlobal() *FlagsGlobal {
+    return t.Global
+}

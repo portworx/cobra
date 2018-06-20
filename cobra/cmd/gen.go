@@ -46,6 +46,12 @@ var (
 	// commandWriter wraps commandBuffer.
 	commandWriter *bufio.Writer
 
+	// structBuffer stores new structs for flag values
+	structBuffer bytes.Buffer
+
+	// structWriter wraps structBuffer
+	structWriter *bufio.Writer
+
 	// symbolBuffer stores symbol table for use in conjunction with cflags.Provider interface.
 	// It dumps symbol table that provide a way to lookup flagnames during access.
 	symbolBuffer bytes.Buffer
@@ -71,6 +77,18 @@ produces boilerplate code for CLI.`,
 		commands = make([]*cmdSpec, 0, 0)
 		if err := yaml.Unmarshal(yb, &commands); err != nil {
 			return err
+		}
+
+		for _, c := range commands {
+			if c.Name == "cluster" {
+				for _, d := range c.SubCmd {
+					if d.Name == "config" {
+						setInputInterface(d)
+						break
+					}
+				}
+				break
+			}
 		}
 
 		// remove all auto-generated files from command path
@@ -114,9 +132,11 @@ produces boilerplate code for CLI.`,
 
 		commandWriter.Flush()
 		symbolWriter.Flush()
+		structWriter.Flush()
 		f := make(map[string]interface{})
 		f["functions"] = string(commandBuffer.Bytes())
 		f["constants"] = string(symbolBuffer.Bytes())
+		f["structs"] = string(structBuffer.Bytes())
 
 		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunctions.tmpl")); err != nil {
 			return err
@@ -124,14 +144,14 @@ produces boilerplate code for CLI.`,
 			if b, err := executeTemplate(string(t), f); err != nil {
 				return err
 			} else {
-				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "execNotImplemented.go")
+				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "execStubs.go")
 				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
 					return err
 				}
 			}
 		}
 
-		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxSymbols.tmpl")); err != nil {
+		/*if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxSymbols.tmpl")); err != nil {
 			return err
 		} else {
 			if b, err := executeTemplate(string(t), f); err != nil {
@@ -142,10 +162,32 @@ produces boilerplate code for CLI.`,
 					return err
 				}
 			}
+		}*/
+
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxStructs.tmpl")); err != nil {
+			return err
+		} else {
+			if b, err := executeTemplate(string(t), f); err != nil {
+				return err
+			} else {
+				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "types.go")
+				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil
 	},
+}
+
+func setInputInterface(cmd *cmdSpec) {
+		cmd.InputInterface = true
+		if len(cmd.SubCmd) > 0 {
+			for _, c := range cmd.SubCmd {
+				setInputInterface(c)
+			}
+		}
 }
 
 func init() {
@@ -153,6 +195,7 @@ func init() {
 	cmdNames = make(map[string]bool)
 	commandWriter = bufio.NewWriter(&commandBuffer)
 	symbolWriter = bufio.NewWriter(&symbolBuffer)
+	structWriter = bufio.NewWriter(&structBuffer)
 
 	// init executable path
 	if execPath, err := os.Executable(); err != nil {
@@ -258,8 +301,14 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		data["keyPath"] = ""
 	}
 
+	if cmd.InputInterface {
+		data["inputInterface"] = true
+	} else {
+		data["inputInterface"] = false
+	}
+
 	keys := strings.Split(strings.Replace(data["keyPath"].(string), "/", "-", -1), "-")
-	execFunc := "xec"
+	execFunc := ""
 	for _, key := range keys {
 		key := strings.TrimSpace(key)
 		if len(key) > 0 {
@@ -272,9 +321,10 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			}
 		}
 	}
-	data["func"] = "cli.E" + execFunc + formatInputUp(cmd.Name)
-	data["funcInCli"] = "E" + execFunc + formatInputUp(cmd.Name)
-	data["localFunc"] = "e" + execFunc + formatInputUp(cmd.Name)
+	data["func"] = "cli.Exec" + execFunc + formatInputUp(cmd.Name)
+	data["funcInCli"] = "Exec" + execFunc + formatInputUp(cmd.Name)
+	data["localFunc"] = "exec" + execFunc + formatInputUp(cmd.Name)
+	data["localStruct"] = "Flags" + execFunc + formatInputUp(cmd.Name)
 
 	if len(cmd.Func) > 0 {
 		data["func"] = cmd.Func
@@ -316,7 +366,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			boolFlags = append(boolFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagBool
-			stub.Name = formatInputLo(flag.Name)
+			stub.Name = formatInputUp(flag.Name)
+			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -326,7 +377,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			strFlags = append(strFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagStr
-			stub.Name = formatInputLo(flag.Name)
+			stub.Name = formatInputUp(flag.Name)
+			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -339,7 +391,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			intFlags = append(intFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagInt
-			stub.Name = formatInputLo(flag.Name)
+			stub.Name = formatInputUp(flag.Name)
+			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -352,7 +405,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			uintFlags = append(uintFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagUint
-			stub.Name = formatInputLo(flag.Name)
+			stub.Name = formatInputUp(flag.Name)
+			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -365,7 +419,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			strSliceFlags = append(strSliceFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagStrSlice
-			stub.Name = formatInputLo(flag.Name)
+			stub.Name = formatInputUp(flag.Name)
+			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -378,7 +433,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			intSliceFlags = append(intSliceFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagIntSlice
-			stub.Name = formatInputLo(flag.Name)
+			stub.Name = formatInputUp(flag.Name)
+			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -403,6 +459,29 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	data["strStubs"] = strStubs
 	data["strSliceStubs"] = strSliceStubs
 	data["intSliceStubs"] = intSliceStubs
+
+	// dump a go file for new command
+	if !cmd.InputInterface {
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxStruct.tmpl")); err != nil {
+			return err
+		} else {
+			if b, err := executeTemplate(string(t), data); err != nil {
+				er(err)
+			} else {
+				structWriter.Write([]byte(b))
+			}
+		}
+	}
+
+	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxData.tmpl")); err != nil {
+		return err
+	} else {
+		if b, err := executeTemplate(string(t), data); err != nil {
+			er(err)
+		} else {
+			data["dataStubs"] = b
+		}
+	}
 
 	// dump a go file for new command
 	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxCommand.tmpl")); err != nil {

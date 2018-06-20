@@ -81,21 +81,18 @@ func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 		{{- end }}
 	{{- end }}
 
+        {{ if eq .inputInterface true -}}
         vp.Set("args", args)
-		provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")
-		if err != nil {
-			return err
-		}
-
-		{{ if eq .func "" -}}
-			_ = provider
-			// enter your exec func here
-			// return yourExecFunc(provider)
-			fmt.Println("{{.cmdName}} called")
-			return nil
-		{{- else -}}
-			return {{.func}}(provider)
-		{{- end }}
+        provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")
+        if err != nil {
+            return err
+        }
+        return {{.func}}(provider)
+        {{ else }}
+        // populate fields for data type specific for this func
+            {{.dataStubs}}
+        	return {{.func}}(data)
+        {{ end }}
 }
 
 func init() {
