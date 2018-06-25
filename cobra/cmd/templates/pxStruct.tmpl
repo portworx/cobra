@@ -45,18 +45,26 @@ type {{.localStruct}} struct {
 {{- end }}
 };
 
+// GetGlobal provides access global flags.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *{{.localStruct}}) GetGlobal() *FlagsGlobal {
     return t.Global
 }
 
+// String implements stringer interface.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *{{.localStruct}}) String() string {
     return "{{.localStruct}}"
 }
 
+// Serialize provides serialization method on this struct.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *{{.localStruct}}) Serialize() ([]byte, error) {
     return json.Marshal(t)
 }
 
+// Deserialize provides deserialization method for this struct.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *{{.localStruct}}) Deserialize(b []byte) error {
     return json.Unmarshal(b, t)
 }

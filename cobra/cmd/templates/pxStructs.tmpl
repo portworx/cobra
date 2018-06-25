@@ -1,30 +1,34 @@
 package cli
 
+// This is an auto-generated file. Pl. DO NOT EDIT
+
 // a type is defined for each CLI function in order to pass
 // flag values as a type safe transport mechanism.
 
+// Error implements Error interface.
+// Auto-generated. Pl. DO NOT EDIT
 type Error string
 
+// Error implements Error interface.
+// Auto-generated. Pl. DO NOT EDIT
 func (e Error) Error() string {
 	return string(e)
 }
 
+// consts required for returning errors.
+// Auto-generated. Pl. DO NOT EDIT
 const (
 	FlagsNotValidated Error = "flags are not validated"
-	InputTypeNotValid Error = "input arg types are not valid"
 )
 
-// This is an auto-generated file. Pl. DO NOT EDIT
-
 // GlobalFlagger provides a pointer to global flag object
+// Auto-generated. Pl. DO NOT EDIT
 type GlobalFlagger interface {
     GetGlobal() *FlagsGlobal
 }
 
 // SerializerDeserializer provides serialization methods.
-// No errors are involved here and that is an intentional design
-// choice because this is supposed to work on auto-generated structs
-// which are safe to use in these functions.
+// Auto-generated. Pl. DO NOT EDIT
 type SerializerDeserializer interface {
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
@@ -45,48 +49,35 @@ type FlagsGlobal struct {
 	Port string
 }
 
+// GetGlobal provides access to global flags struct.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *FlagsGlobal) GetGlobal() *FlagsGlobal {
     return t
 }
 
+// Serialize provides serialization method on this struct.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *FlagsGlobal) Serialize() ([]byte, error) {
     return json.Marshal(t)
 }
 
+// Deserialize provides deserialization method for this struct.
+// Auto-generated. Pl. DO NOT EDIT
 func (t *FlagsGlobal) Deserialize(b []byte) error {
     return json.Unmarshal(b, t)
 }
 
 {{.structs}}
 
-// flag2FlagCommonAttributesCopy copies common data fields between two flag types
-func flag2FlagCommonAttributesCopy(x, y SerializerDeserializer) error {
-        var b []byte
-        var err error
-
-        switch v := x.(type) {
-        {{- range $key, $value := .typeList }}
-        case *{{ $value }}:
-            b, err = v.Serialize()
-            if err != nil {
-                return err
-            };
-        {{- end }}
-        default:
-            return InputTypeNotValid
+// flagsCopyCommonAttributes copies common data fields between two flag types.
+// Auto-generated. Pl. DO NOT EDIT
+func flagsCopyCommonAttributes(src, dst SerializerDeserializer) error {
+    if b, err := src.Serialize(); err != nil {
+        return err
+    } else {
+        if err := dst.Deserialize(b); err != nil {
+            return err
         }
-
-        switch v := y.(type) {
-        {{- range $key, $value := .typeList }}
-        case *{{ $value }}:
-            err = v.Deserialize(b)
-            if err != nil {
-                return err
-            };
-        {{- end }}
-        default:
-             return InputTypeNotValid
-        }
-
-        return nil
+    }
+    return nil
 }
