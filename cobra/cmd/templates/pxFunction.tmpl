@@ -7,9 +7,17 @@
 // Please also register this function in YAML spec file.
 */
 // {{.funcInCli}} {{.short}}
-func {{.funcInCli}}(provider cflags.Provider) error {
-    fmt.Println("{{.funcInCli}} is not implemented")
-	return nil
+func {{.funcInCli}}(d *{{.localStruct}}, provider cflags.Provider) error {
+    if d == nil {
+            return FlagsNotValidated
+        }
+        fmt.Println("{{.funcInCli}} is not implemented")
+        if b, err := json.MarshalIndent(d, "", "  "); err != nil {
+            return err
+        } else {
+            fmt.Println(string(b))
+        }
+    	return nil
 }
 {{ else }}
 /*

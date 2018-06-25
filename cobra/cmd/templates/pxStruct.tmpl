@@ -3,8 +3,8 @@
 type {{.localStruct}} struct {
     // global flags
     Global *FlagsGlobal
-	// args
-	Args []string
+    // args
+    Args []string
 	// local flags
 {{ range $key, $value := .boolStubs -}}
         {{$value.Name}} bool;
@@ -24,8 +24,39 @@ type {{.localStruct}} struct {
 {{- range $key, $value := .intSliceStubs -}}
         {{$value.Name}} []int;
 {{- end }}
+// IsSet status
+{{ range $key, $value := .boolStubs -}}
+        IsSet{{$value.Name}} bool;
+{{- end }}
+{{- range $key, $value := .strStubs -}}
+        IsSet{{$value.Name}} bool;
+{{- end }}
+{{- range $key, $value := .intStubs -}}
+        IsSet{{$value.Name}} bool;
+{{- end }}
+{{- range $key, $value := .uintStubs -}}
+        IsSet{{$value.Name}} bool;
+{{- end }}
+{{- range $key, $value := .strSliceStubs -}}
+        IsSet{{$value.Name}} bool;
+{{- end }}
+{{- range $key, $value := .intSliceStubs -}}
+        IsSet{{$value.Name}} bool;
+{{- end }}
 };
 
 func (t *{{.localStruct}}) GetGlobal() *FlagsGlobal {
     return t.Global
+}
+
+func (t *{{.localStruct}}) String() string {
+    return "{{.localStruct}}"
+}
+
+func (t *{{.localStruct}}) Serialize() ([]byte, error) {
+    return json.Marshal(t)
+}
+
+func (t *{{.localStruct}}) Deserialize(b []byte) error {
+    return json.Unmarshal(b, t)
 }

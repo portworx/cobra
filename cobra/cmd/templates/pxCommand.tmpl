@@ -81,16 +81,16 @@ func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 		{{- end }}
 	{{- end }}
 
+        {{.dataStubs}}
         {{ if eq .inputInterface true -}}
         vp.Set("args", args)
         provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")
         if err != nil {
             return err
         }
-        return {{.func}}(provider)
+        return {{.func}}(data, provider)
         {{ else }}
         // populate fields for data type specific for this func
-            {{.dataStubs}}
         	return {{.func}}(data)
         {{ end }}
 }

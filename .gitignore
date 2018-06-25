@@ -37,3 +37,6 @@ cobra.test
 
 # ide's
 .idea
+
+# pkgs
+cobra-pkg*

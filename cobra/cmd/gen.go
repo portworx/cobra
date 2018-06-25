@@ -58,6 +58,9 @@ var (
 
 	// symbolWriter wraps symbolBuffer.
 	symbolWriter *bufio.Writer
+
+	// typeList simply holds list of declared types are strings
+	typeList []string
 )
 
 // genCmd represents the gen command.
@@ -137,6 +140,7 @@ produces boilerplate code for CLI.`,
 		f["functions"] = string(commandBuffer.Bytes())
 		f["constants"] = string(symbolBuffer.Bytes())
 		f["structs"] = string(structBuffer.Bytes())
+		f["typeList"] = typeList
 
 		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunctions.tmpl")); err != nil {
 			return err
@@ -182,12 +186,12 @@ produces boilerplate code for CLI.`,
 }
 
 func setInputInterface(cmd *cmdSpec) {
-		cmd.InputInterface = true
-		if len(cmd.SubCmd) > 0 {
-			for _, c := range cmd.SubCmd {
-				setInputInterface(c)
-			}
+	cmd.InputInterface = true
+	if len(cmd.SubCmd) > 0 {
+		for _, c := range cmd.SubCmd {
+			setInputInterface(c)
 		}
+	}
 }
 
 func init() {
@@ -325,6 +329,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	data["funcInCli"] = "Exec" + execFunc + formatInputUp(cmd.Name)
 	data["localFunc"] = "exec" + execFunc + formatInputUp(cmd.Name)
 	data["localStruct"] = "Flags" + execFunc + formatInputUp(cmd.Name)
+	typeList = append(typeList, data["localStruct"].(string))
 
 	if len(cmd.Func) > 0 {
 		data["func"] = cmd.Func
@@ -461,15 +466,13 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	data["intSliceStubs"] = intSliceStubs
 
 	// dump a go file for new command
-	if !cmd.InputInterface {
-		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxStruct.tmpl")); err != nil {
-			return err
+	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxStruct.tmpl")); err != nil {
+		return err
+	} else {
+		if b, err := executeTemplate(string(t), data); err != nil {
+			er(err)
 		} else {
-			if b, err := executeTemplate(string(t), data); err != nil {
-				er(err)
-			} else {
-				structWriter.Write([]byte(b))
-			}
+			structWriter.Write([]byte(b))
 		}
 	}
 

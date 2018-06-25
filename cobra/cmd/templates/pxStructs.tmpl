@@ -11,9 +11,24 @@ func (e Error) Error() string {
 
 const (
 	FlagsNotValidated Error = "flags are not validated"
+	InputTypeNotValid Error = "input arg types are not valid"
 )
 
 // This is an auto-generated file. Pl. DO NOT EDIT
+
+// GlobalFlagger provides a pointer to global flag object
+type GlobalFlagger interface {
+    GetGlobal() *FlagsGlobal
+}
+
+// SerializerDeserializer provides serialization methods.
+// No errors are involved here and that is an intentional design
+// choice because this is supposed to work on auto-generated structs
+// which are safe to use in these functions.
+type SerializerDeserializer interface {
+	Serialize() ([]byte, error)
+	Deserialize([]byte) error
+}
 
 // FlagsGlobal aggregates global flags.
 // This is auto-generated. Pl. DO NOT EDIT
@@ -30,4 +45,48 @@ type FlagsGlobal struct {
 	Port string
 }
 
+func (t *FlagsGlobal) GetGlobal() *FlagsGlobal {
+    return t
+}
+
+func (t *FlagsGlobal) Serialize() ([]byte, error) {
+    return json.Marshal(t)
+}
+
+func (t *FlagsGlobal) Deserialize(b []byte) error {
+    return json.Unmarshal(b, t)
+}
+
 {{.structs}}
+
+// flag2FlagCommonAttributesCopy copies common data fields between two flag types
+func flag2FlagCommonAttributesCopy(x, y SerializerDeserializer) error {
+        var b []byte
+        var err error
+
+        switch v := x.(type) {
+        {{- range $key, $value := .typeList }}
+        case *{{ $value }}:
+            b, err = v.Serialize()
+            if err != nil {
+                return err
+            };
+        {{- end }}
+        default:
+            return InputTypeNotValid
+        }
+
+        switch v := y.(type) {
+        {{- range $key, $value := .typeList }}
+        case *{{ $value }}:
+            err = v.Deserialize(b)
+            if err != nil {
+                return err
+            };
+        {{- end }}
+        default:
+             return InputTypeNotValid
+        }
+
+        return nil
+}
