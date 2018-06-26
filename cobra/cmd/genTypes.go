@@ -17,6 +17,7 @@ type flagSpec struct {
 	Default    string
 	Hidden     bool
 	Persistent bool
+	Required   bool
 	Func       string
 }
 

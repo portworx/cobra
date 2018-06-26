@@ -29,54 +29,66 @@ func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 	{{ range $key, $value := .boolFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/persistent/{{$value.Name}}");
 			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
 			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/persistent/{{$value.Name}}");
 			vp.SetDefault("/persistent/{{$value.Name}}", "{{$value.Default}}");
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
 			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", "{{$value.Default}}");
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/persistent/{{$value.Name}}");
 			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
 			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .uintFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/persistent/{{$value.Name}}");
 			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
 			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strSliceFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/persistent/{{$value.Name}}");
 			vp.SetDefault("/persistent/{{$value.Name}}", nil);
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
 			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intSliceFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/persistent/{{$value.Name}}");
 			vp.SetDefault("/persistent/{{$value.Name}}", nil);
 		{{- else -}}
 			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
 			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
@@ -111,6 +123,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkPersistentFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
 				{{$.cmdVarName}}Cmd.Flags().Bool("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
@@ -120,6 +135,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strFlags -}}
@@ -132,6 +150,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkPersistentFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
 				{{$.cmdVarName}}Cmd.Flags().String("{{$value.Name}}", "{{$value.Default}}", "{{$value.Use}}");
@@ -141,6 +162,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intFlags -}}
@@ -153,6 +177,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkPersistentFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
 				{{$.cmdVarName}}Cmd.Flags().Int("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
@@ -162,6 +189,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .uintFlags -}}
@@ -174,6 +204,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkPersistentFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
 				{{$.cmdVarName}}Cmd.Flags().Uint("{{$value.Name}}", {{$value.Default}}, "{{$value.Use}}");
@@ -183,6 +216,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strSliceFlags -}}
@@ -195,6 +231,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkPersistentFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
 				{{$.cmdVarName}}Cmd.Flags().StringSlice("{{$value.Name}}", nil, "{{$value.Use}}");
@@ -204,6 +243,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intSliceFlags -}}
@@ -216,6 +258,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.PersistentFlags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkPersistentFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- else -}}
 			{{- if eq $value.Short "" -}}
 				{{$.cmdVarName}}Cmd.Flags().IntSlice("{{$value.Name}}", nil, "{{$value.Use}}");
@@ -225,6 +270,9 @@ func init() {
 			{{- if eq $value.Hidden true -}}
 				{{$.cmdVarName}}Cmd.Flags().MarkHidden("{{$value.Name}}");
 			{{- end }}
+			{{- if eq $value.Required true -}}
+                {{$.cmdVarName}}Cmd.MarkFlagRequired("{{$value.Name}}");
+            {{- end }}
 		{{- end }}
 	{{- end }}
 }
