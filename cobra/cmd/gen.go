@@ -352,8 +352,6 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		flag := flag
 		if flag.Required {
 			flag.Use = "(Required) " + flag.Use
-		} else {
-			flag.Use = "(Optional) " + flag.Use
 		}
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
 			strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
