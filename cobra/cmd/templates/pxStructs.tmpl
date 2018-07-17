@@ -24,7 +24,7 @@ const (
 // GlobalFlagger provides a pointer to global flag object
 // Auto-generated. Pl. DO NOT EDIT
 type GlobalFlagger interface {
-    GetGlobal() *FlagsGlobal
+	GetGlobal() *FlagsGlobal
 }
 
 // SerializerDeserializer provides serialization methods.
@@ -37,34 +37,34 @@ type SerializerDeserializer interface {
 // FlagsGlobal aggregates global flags.
 // This is auto-generated. Pl. DO NOT EDIT
 type FlagsGlobal struct {
-    // global flags
-    Json bool
-	Raw bool
+	// global flags
+	Json  bool
+	Raw   bool
 	Color bool
-	Ssl bool
-	Ca string
-	Cert string
-	Key string
-	Host string
-	Port string
+	Ssl   bool
+	Ca    string
+	Cert  string
+	Key   string
+	Host  string
+	Port  string
 }
 
 // GetGlobal provides access to global flags struct.
 // Auto-generated. Pl. DO NOT EDIT
 func (t *FlagsGlobal) GetGlobal() *FlagsGlobal {
-    return t
+	return t
 }
 
 // Serialize provides serialization method on this struct.
 // Auto-generated. Pl. DO NOT EDIT
 func (t *FlagsGlobal) Serialize() ([]byte, error) {
-    return json.Marshal(t)
+	return json.Marshal(t)
 }
 
 // Deserialize provides deserialization method for this struct.
 // Auto-generated. Pl. DO NOT EDIT
 func (t *FlagsGlobal) Deserialize(b []byte) error {
-    return json.Unmarshal(b, t)
+	return json.Unmarshal(b, t)
 }
 
 {{.structs}}
@@ -72,12 +72,12 @@ func (t *FlagsGlobal) Deserialize(b []byte) error {
 // flagsCopyCommonAttributes copies common data fields between two flag types.
 // Auto-generated. Pl. DO NOT EDIT
 func flagsCopyCommonAttributes(src, dst SerializerDeserializer) error {
-    if b, err := src.Serialize(); err != nil {
-        return err
-    } else {
-        if err := dst.Deserialize(b); err != nil {
-            return err
-        }
-    }
-    return nil
+	if b, err := src.Serialize(); err != nil {
+		return err
+	} else {
+		if err := dst.Deserialize(b); err != nil {
+			return err
+		}
+	}
+	return nil
 }
