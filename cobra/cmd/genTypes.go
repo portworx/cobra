@@ -62,16 +62,21 @@ type flagSpec struct {
 	// Required enforces flag value to be entered on CLI.
 	Required bool
 
-	// Func is a validation func (not yet implemented)
-	Func string
+	// ValidValues is a list against which input values will be evaluated.
+	ValidValues []string
+
+	// ValidRange is a range of values against which input values will be evaluated.
+	ValidRange []string
 }
 
 type flagStub struct {
-	Key        string
-	Name       string
-	VarName    string
-	Type       string
-	Persistent bool
+	Key         string
+	Name        string
+	VarName     string
+	Type        string
+	Persistent  bool
+	ValidValues []string
+	ValidRange  []string
 }
 
 // cmdSpec defines an individual command.

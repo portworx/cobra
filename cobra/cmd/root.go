@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,7 +37,9 @@ to quickly create a Cobra application.`,
 
 // Execute executes the root command.
 func Execute() {
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		logrus.Fatal(err)
+	}
 }
 
 func init() {

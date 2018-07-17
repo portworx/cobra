@@ -65,21 +65,34 @@ var (
 
 // genCmd represents the gen command.
 var genCmd = &cobra.Command{
-	Use:   "gen",
-	Short: "auto-gen CLI using YAML spec",
+	Use:     "gen",
+	Example: "cobra gen -f file1.yaml [file2.yaml [file3.yaml]]",
+	Short:   "auto-gen CLI using YAML spec",
 	Long: `This command takes a YAML description of CLI as input and
 produces boilerplate code for CLI.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fileName := cmd.Flag("file").Value.String()
 
-		// read yaml file
-		yb, err := ioutil.ReadFile(fileName)
-		if err != nil {
-			return err
+		yamlfiles := make([]string, 0, 0)
+		if cmd.Flag("file").Changed {
+			fileName := cmd.Flag("file").Value.String()
+			yamlfiles = append(yamlfiles, fileName)
 		}
+		yamlfiles = append(yamlfiles, args...)
+
 		commands = make([]*cmdSpec, 0, 0)
-		if err := yaml.Unmarshal(yb, &commands); err != nil {
-			return err
+
+		for _, fileName := range yamlfiles {
+			// read yaml file
+			yb, err := ioutil.ReadFile(fileName)
+			if err != nil {
+				return err
+			}
+			cmds := make([]*cmdSpec, 0, 0)
+			if err := yaml.Unmarshal(yb, &cmds); err != nil {
+				return err
+			}
+
+			commands = append(commands, cmds...)
 		}
 
 		for _, c := range commands {
@@ -380,6 +393,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
+			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 {
+				return fmt.Errorf("bool flag cannot have validation checks. pl. fix yaml")
+			}
 			boolStubs = append(boolStubs, stub)
 		case FlagStr:
 			strFlags = append(strFlags, flag)
@@ -391,6 +407,10 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
+			stub.ValidValues = flag.ValidValues
+			if len(flag.ValidRange) > 0 {
+				return fmt.Errorf("str flag cannot have valid ranges. pl. fix yaml")
+			}
 			strStubs = append(strStubs, stub)
 		case FlagInt:
 			if _, err := strconv.ParseInt(flag.Default, 10, 32); err != nil {
@@ -405,6 +425,29 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
+			if len(flag.ValidRange) > 0 && len(flag.ValidValues) > 0 {
+				return fmt.Errorf("enter either valid values or valid range, not both")
+			}
+			if len(flag.ValidRange) > 0 {
+				if len(flag.ValidRange) != 2 {
+					return fmt.Errorf("range can only contain two values")
+				} else {
+					if flag.ValidRange[0] >= flag.ValidRange[1] {
+						return fmt.Errorf("range values not in ascending order")
+					}
+				}
+			}
+
+			if err := validateSliceForAType(flag.ValidValues, FlagInt); err != nil {
+				return fmt.Errorf("%s %s: %v", flag.Name, "valid values are not valid", err)
+			}
+
+			if err := validateSliceForAType(flag.ValidRange, FlagInt); err != nil {
+				return fmt.Errorf("%s %s: %v", flag.Name, "valid values are not valid", err)
+			}
+
+			stub.ValidValues = flag.ValidValues
+			stub.ValidRange = flag.ValidRange
 			intStubs = append(intStubs, stub)
 		case FlagUint:
 			if _, err := strconv.ParseUint(flag.Default, 10, 32); err != nil {
@@ -419,6 +462,29 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
+			if len(flag.ValidRange) > 0 && len(flag.ValidValues) > 0 {
+				return fmt.Errorf("enter either valid values or valid range, not both")
+			}
+			if len(flag.ValidRange) > 0 {
+				if len(flag.ValidRange) != 2 {
+					return fmt.Errorf("range can only contain two values")
+				} else {
+					if flag.ValidRange[0] >= flag.ValidRange[1] {
+						return fmt.Errorf("range values not in ascending order")
+					}
+				}
+			}
+
+			if err := validateSliceForAType(flag.ValidValues, FlagUint); err != nil {
+				return fmt.Errorf("%s %s: %v", flag.Name, "valid values are not valid", err)
+			}
+
+			if err := validateSliceForAType(flag.ValidRange, FlagUint); err != nil {
+				return fmt.Errorf("%s %s: %v", flag.Name, "valid values are not valid", err)
+			}
+
+			stub.ValidValues = flag.ValidValues
+			stub.ValidRange = flag.ValidRange
 			uintStubs = append(uintStubs, stub)
 		case FlagStrSlice:
 			if flag.Default != "" {
@@ -433,6 +499,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
+			if len(flag.ValidRange) > 0 || len(flag.ValidValues) > 0 {
+				return fmt.Errorf("str slice flag cannot have valid ranges or valid values. pl. fix yaml")
+			}
 			strSliceStubs = append(strSliceStubs, stub)
 		case FlagIntSlice:
 			if flag.Default != "" {
@@ -447,6 +516,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
+			if len(flag.ValidRange) > 0 || len(flag.ValidValues) > 0 {
+				return fmt.Errorf("int slice flag cannot have valid ranges or valid values. pl. fix yaml")
+			}
 			intSliceStubs = append(intSliceStubs, stub)
 		default:
 			return fmt.Errorf("invalid flag type. Valid types: %s, %s, %s, %s, %s, %s",
@@ -578,4 +650,28 @@ func formatInputLo(x string) string {
 		out = strings.ToLower(string(out[0])) + out[1:]
 	}
 	return out
+}
+
+func validateSliceForAType(values []string, flagType string) error {
+	if len(values) == 0 {
+		return nil
+	}
+
+	switch flagType {
+	case FlagInt:
+		for _, value := range values {
+			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+				return err
+			}
+		}
+	case FlagUint:
+		for _, value := range values {
+			if _, err := strconv.ParseUint(value, 10, 64); err != nil {
+				return err
+			}
+		}
+	default:
+		return nil
+	}
+	return nil
 }

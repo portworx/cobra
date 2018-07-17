@@ -97,20 +97,55 @@ data := new(cli.{{.localStruct}})
 // args
 data.Args = args
 
+// bool status
+status := false
+_ = status
+
 // local flags
 {{ range $key, $value := .boolStubs -}}
         data.{{$value.Name}} = {{$value.Name}};
         data.IsSet{{$value.Name}} = isSet{{$value.Name}};
 {{- end }}
 {{- range $key, $value := .strStubs -}}
+        {{ $length := len $value.ValidValues }} {{ if ne $length 0 }}
+            status = false;
+            {{- range $validKey, $validValue := $value.ValidValues -}}
+                if {{$value.Name}} == "{{$validValue}}" { status = true };
+            {{- end }}
+            if !status { return fmt.Errorf("{{$value.Name}} value is not valid. See help") };
+        {{- end }}
         data.{{$value.Name}} = {{$value.Name}};
         data.IsSet{{$value.Name}} = isSet{{$value.Name}};
 {{- end }}
 {{- range $key, $value := .intStubs -}}
+        {{ $length := len $value.ValidValues }} {{ if ne $length 0 }}
+            status = false;
+            {{- range $validKey, $validValue := $value.ValidValues -}}
+                if {{$value.Name}} == {{$validValue}} { status = true };
+            {{- end }}
+            if !status { return fmt.Errorf("{{$value.Name}} value is not valid. See help") };
+        {{- end }}
+        {{ $length := len $value.ValidRange }} {{ if eq $length 2 }}
+            status = false;
+            if {{$value.Name}} >= {{index $value.ValidRange 0}} && {{$value.Name}} <= {{index $value.ValidRange 1}} { status = true };
+            if !status { return fmt.Errorf("{{$value.Name}} value is not valid. See help") };
+        {{- end }}
         data.{{$value.Name}} = {{$value.Name}};
         data.IsSet{{$value.Name}} = isSet{{$value.Name}};
 {{- end }}
 {{- range $key, $value := .uintStubs -}}
+        {{ $length := len $value.ValidValues }} {{ if ne $length 0 }}
+            status = false;
+            {{- range $validKey, $validValue := $value.ValidValues -}}
+                if {{$value.Name}} == {{$validValue}} { status = true };
+                {{- end }}
+                if !status { return fmt.Errorf("{{$value.Name}} value is not valid. See help") };
+            {{- end }}
+        {{ $length := len $value.ValidRange }} {{ if eq $length 2 }}
+            status = false;
+            if {{$value.Name}} >= {{index $value.ValidRange 0}} && {{$value.Name}} <= {{index $value.ValidRange 1}} { status = true };
+            if !status { return fmt.Errorf("{{$value.Name}} value is not valid. See help") };
+        {{- end }}
         data.{{$value.Name}} = {{$value.Name}};
         data.IsSet{{$value.Name}} = isSet{{$value.Name}};
 {{- end }}
