@@ -7,10 +7,15 @@
 package {{.cmdPackage}}
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/spf13/cobra"
+	"os"
+
+	"github.com/portworx/porx/px/cli"
 	"github.com/portworx/porx/px/cli/cflags"
-	{{ if ne .imports "" }}"{{.imports}}"{{ end }}
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+    {{ if ne .imports "" }}"{{.imports}}"{{ end }}
 )
 
 // all content below this line is auto-generated. Please DO NOT EDIT
@@ -95,6 +100,17 @@ func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 	{{- end }}
 
         {{.dataStubs}}
+
+        // mock enables simply printing out flag inputs for testing purposes
+        if len(os.Getenv("PXCTL__ENABLE_MOCK")) > 0 {
+            if b, err := json.Marshal(data); err != nil {
+        	    logrus.Fatal(err)
+            } else {
+        	    fmt.Println(string(b))
+        	    return nil
+            }
+        }
+
         {{ if eq .inputInterface true -}}
         vp.Set("args", args)
         provider, err := cflags.NewViperProvider(cmd, vp, "{{$.keyPath}}/{{$.cmdName}}/local")

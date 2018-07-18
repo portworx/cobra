@@ -431,8 +431,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				if len(flag.ValidRange) != 2 {
 					return fmt.Errorf("range can only contain two values")
 				} else {
-					if flag.ValidRange[0] >= flag.ValidRange[1] {
-						return fmt.Errorf("range values not in ascending order")
+					if flag.ValidRange[0] > flag.ValidRange[1] {
+						return fmt.Errorf("range values not in ascending order %v", flag.ValidRange)
 					}
 				}
 			}
@@ -476,8 +476,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				if len(flag.ValidRange) != 2 {
 					return fmt.Errorf("range can only contain two values")
 				} else {
-					if flag.ValidRange[0] >= flag.ValidRange[1] {
-						return fmt.Errorf("range values not in ascending order")
+					if flag.ValidRange[0] > flag.ValidRange[1] {
+						return fmt.Errorf("range values not in ascending order: %v", flag.ValidRange)
 					}
 				}
 			}
