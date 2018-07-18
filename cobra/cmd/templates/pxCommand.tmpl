@@ -20,6 +20,7 @@ var {{.cmdVarName}}Cmd = &cobra.Command{
 	Use:   "{{.cmdName}}",
 	Short: "{{.short}}",
 	Long: `{{.long}}`,
+	Example: `{{.example}}`,
 	Aliases: []string{ {{ range $key, $value := .aliases }}"{{ $value }}",{{ end }} },
 	Hidden: {{.hidden}},
 	RunE: {{.localFunc}},
@@ -28,68 +29,68 @@ var {{.cmdVarName}}Cmd = &cobra.Command{
 func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 	{{ range $key, $value := .boolFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("/persistent/{{$value.Name}}");
-			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/global/{{$value.Name}}");
+			vp.SetDefault("/global/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}")
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("/persistent/{{$value.Name}}");
-			vp.SetDefault("/persistent/{{$value.Name}}", "{{$value.Default}}");
+			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/global/{{$value.Name}}");
+			vp.SetDefault("/global/{{$value.Name}}", "{{$value.Default}}");
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", "{{$value.Default}}");
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}")
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", "{{$value.Default}}");
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("/persistent/{{$value.Name}}");
-			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/global/{{$value.Name}}");
+			vp.SetDefault("/global/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}")
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .uintFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("/persistent/{{$value.Name}}");
-			vp.SetDefault("/persistent/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/global/{{$value.Name}}");
+			vp.SetDefault("/global/{{$value.Name}}", {{$value.Default}});
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", {{$value.Default}});
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}")
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", {{$value.Default}});
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .strSliceFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("/persistent/{{$value.Name}}");
-			vp.SetDefault("/persistent/{{$value.Name}}", nil);
+			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/global/{{$value.Name}}");
+			vp.SetDefault("/global/{{$value.Name}}", nil);
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}")
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
 	{{- range $key, $value := .intSliceFlags -}}
 		{{- if eq $value.Persistent true -}}
-			vp.BindPFlag("/persistent/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("/persistent/{{$value.Name}}");
-			vp.SetDefault("/persistent/{{$value.Name}}", nil);
+			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("/global/{{$value.Name}}");
+			vp.SetDefault("/global/{{$value.Name}}", nil);
 		{{- else -}}
-			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
-			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}")
-			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/local/{{$value.Name}}", nil);
+			vp.BindPFlag("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", cmd.Flags().Lookup("{{$value.Name}}"));
+			vp.BindEnv("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}")
+			vp.SetDefault("{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}", nil);
 		{{- end }}
 	{{- end }}
 
@@ -109,6 +110,7 @@ func {{.localFunc}}(cmd *cobra.Command, args []string) error {
 
 func init() {
 	{{.parentName}}.AddCommand({{.cmdVarName}}Cmd)
+	{{$.cmdVarName}}Cmd.Flags().SortFlags = false
 
 	// these flags are auto-generated, please DO NOT EDIT
 

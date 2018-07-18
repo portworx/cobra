@@ -45,13 +45,19 @@ type flagSpec struct {
 	// Shorthand cannot be something that is already defined globally.
 	// Shorthand cannot also be something defined as persistent in parent commands.
 	// For instance, for pxctl CLI, -j is already defined globally.
-	Short string
+	Short string `yaml:"single-letter-shorthand"`
 
 	// Use is a single line short description for the flag usage.
 	Use string
 
 	// Default value for the flag.
 	Default string
+
+	// ValidValues is a list against which input values will be evaluated.
+	ValidValues []string `yaml:"valid-values"`
+
+	// ValidRange is a range of values against which input values will be evaluated.
+	ValidRange []string `yaml:"valid-range"`
 
 	// Hidden indicates if this flag is hidden from CLI view, but still functional.
 	Hidden bool
@@ -61,17 +67,16 @@ type flagSpec struct {
 
 	// Required enforces flag value to be entered on CLI.
 	Required bool
-
-	// Func is a validation func (not yet implemented)
-	Func string
 }
 
 type flagStub struct {
-	Key        string
-	Name       string
-	VarName    string
-	Type       string
-	Persistent bool
+	Key         string
+	Name        string
+	VarName     string
+	Type        string
+	Persistent  bool
+	ValidValues []string
+	ValidRange  []string
 }
 
 // cmdSpec defines an individual command.
@@ -89,13 +94,16 @@ type cmdSpec struct {
 	// Long is a multi-line long description for this command.
 	Long string
 
+	// Example contains sample CLI snippet showing how to run this command.
+	Example string
+
 	// Func is a registered function that should execute for this command.
 	// For consistency all registered functions are defined in pkg cli in exec.go.
 	Func string
 
 	// InputInterface indicates if flag access should be via cflags interface.
 	// This will be deprecated, so do not use.
-	InputInterface bool
+	InputInterface bool `yaml:"input-interface"`
 
 	// Imports is the pkg import string for the registered func.
 	Imports string
