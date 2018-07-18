@@ -1,0 +1,61 @@
+
+	{{ range $key, $value := .boolFlags }}
+		{{ if eq $value.Persistent true }}
+		    {{ if ne $value.Default "" }}
+			    "/global/{{$value.Name}}": {{$value.Default}}
+			{{ else }}
+			    "/global/{{$value.Name}}": false
+			{{ end }}
+		{{ else }}
+		    {{ if ne $value.Default "" }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": {{$value.Default}}
+			{{ else }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": false
+			{{ end }}
+		{{ end }}
+	{{ end }}
+	{{ range $key, $value := .strFlags }}
+		{{ if eq $value.Persistent true }}
+		    {{ if ne $value.Default "" }}
+			    "/global/{{$value.Name}}": "{{$value.Default}}"
+			{{ else }}
+			    "/global/{{$value.Name}}": ""
+			{{ end }}
+		{{ else }}
+		    {{ if ne $value.Default "" }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": "{{$value.Default}}"
+			{{ else }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": ""
+			{{ end }}
+		{{ end }}
+	{{ end }}
+	{{ range $key, $value := .intFlags }}
+		{{ if eq $value.Persistent true }}
+		    {{ if ne $value.Default "" }}
+			    "/global/{{$value.Name}}": {{$value.Default}}
+			{{ else }}
+			    "/global/{{$value.Name}}": 0
+			{{ end }}
+		{{ else }}
+		    {{ if ne $value.Default "" }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": {{$value.Default}}
+			{{ else }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": 0
+			{{ end }}
+		{{ end }}
+	{{ end }}
+	{{ range $key, $value := .uintFlags }}
+		{{ if eq $value.Persistent true }}
+		    {{ if ne $value.Default "" }}
+			    "/global/{{$value.Name}}": {{$value.Default}}
+			{{ else }}
+			    "/global/{{$value.Name}}": 0
+			{{ end }}
+		{{ else }}
+		    {{ if ne $value.Default "" }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": {{$value.Default}}
+			{{ else }}
+			    "{{$.keyPath}}/{{$.cmdName}}/{{$value.Name}}": 0
+			{{ end }}
+		{{ end }}
+	{{ end }}

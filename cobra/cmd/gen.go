@@ -46,6 +46,12 @@ var (
 	// commandWriter wraps commandBuffer.
 	commandWriter *bufio.Writer
 
+	// configBuffer stores yaml config file that could be used as input for cli being built.
+	configBuffer bytes.Buffer
+
+	// configWriter wraps configBuffer.
+	configWriter *bufio.Writer
+
 	// structBuffer stores new structs for flag values
 	structBuffer bytes.Buffer
 
@@ -147,6 +153,7 @@ produces boilerplate code for CLI.`,
 		}
 
 		commandWriter.Flush()
+		configWriter.Flush()
 		symbolWriter.Flush()
 		structWriter.Flush()
 		f := make(map[string]interface{})
@@ -168,19 +175,6 @@ produces boilerplate code for CLI.`,
 			}
 		}
 
-		/*if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxSymbols.tmpl")); err != nil {
-			return err
-		} else {
-			if b, err := executeTemplate(string(t), f); err != nil {
-				return err
-			} else {
-				outFile := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "portworx", "porx", "px", "cli", "symbols.go")
-				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
-					return err
-				}
-			}
-		}*/
-
 		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxStructs.tmpl")); err != nil {
 			return err
 		} else {
@@ -194,7 +188,7 @@ produces boilerplate code for CLI.`,
 			}
 		}
 
-		return nil
+		return ioutil.WriteFile("config.yaml", configBuffer.Bytes(), 0644)
 	},
 }
 
@@ -213,6 +207,7 @@ func init() {
 	commandWriter = bufio.NewWriter(&commandBuffer)
 	symbolWriter = bufio.NewWriter(&symbolBuffer)
 	structWriter = bufio.NewWriter(&structBuffer)
+	configWriter = bufio.NewWriter(&configBuffer)
 
 	// init executable path
 	if execPath, err := os.Executable(); err != nil {
@@ -299,6 +294,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	data["imports"] = cmd.Imports
 	data["aliases"] = cmd.Aliases
 	data["hidden"] = cmd.Hidden
+	data["example"] = cmd.Example
 
 	if cmd.Short == "" {
 		data["short"] = cmd.Name
@@ -307,7 +303,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 	}
 
 	if cmd.Long == "" {
-		data["long"] = cmd.Name
+		data["long"] = cmd.Short
 	} else {
 		data["long"] = cmd.Long
 	}
@@ -384,7 +380,6 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 					return fmt.Errorf("error parsing YAML, invalid default value for bool type %s", flag.Name)
 				}
 			}
-			boolFlags = append(boolFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagBool
 			stub.Name = formatInputUp(flag.Name)
@@ -397,8 +392,8 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				return fmt.Errorf("bool flag cannot have validation checks. pl. fix yaml")
 			}
 			boolStubs = append(boolStubs, stub)
+			boolFlags = append(boolFlags, flag)
 		case FlagStr:
-			strFlags = append(strFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagStr
 			stub.Name = formatInputUp(flag.Name)
@@ -411,12 +406,16 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			if len(flag.ValidRange) > 0 {
 				return fmt.Errorf("str flag cannot have valid ranges. pl. fix yaml")
 			}
+
+			if len(flag.ValidValues) > 0 {
+				flag.Use = fmt.Sprintf("%s (Valid Values: %v)", flag.Use, flag.ValidValues)
+			}
 			strStubs = append(strStubs, stub)
+			strFlags = append(strFlags, flag)
 		case FlagInt:
 			if _, err := strconv.ParseInt(flag.Default, 10, 32); err != nil {
 				return fmt.Errorf("error parsing YAML, invalid default value for int type %s", flag.Name)
 			}
-			intFlags = append(intFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagInt
 			stub.Name = formatInputUp(flag.Name)
@@ -448,12 +447,20 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 
 			stub.ValidValues = flag.ValidValues
 			stub.ValidRange = flag.ValidRange
+
+			if len(flag.ValidValues) > 0 {
+				flag.Use = fmt.Sprintf("%s (Valid Values: %v)", flag.Use, flag.ValidValues)
+			}
+
+			if len(flag.ValidRange) > 0 {
+				flag.Use = fmt.Sprintf("%s (Valid Range: %v)", flag.Use, flag.ValidRange)
+			}
 			intStubs = append(intStubs, stub)
+			intFlags = append(intFlags, flag)
 		case FlagUint:
 			if _, err := strconv.ParseUint(flag.Default, 10, 32); err != nil {
 				return fmt.Errorf("error parsing YAML, invalid default value for uint type %s", flag.Name)
 			}
-			uintFlags = append(uintFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagUint
 			stub.Name = formatInputUp(flag.Name)
@@ -485,12 +492,21 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 
 			stub.ValidValues = flag.ValidValues
 			stub.ValidRange = flag.ValidRange
+
+			if len(flag.ValidValues) > 0 {
+				flag.Use = fmt.Sprintf("%s (Valid Values: %v)", flag.Use, flag.ValidValues)
+			}
+
+			if len(flag.ValidRange) > 0 {
+				flag.Use = fmt.Sprintf("%s (Valid Range: %v)", flag.Use, flag.ValidRange)
+			}
+
 			uintStubs = append(uintStubs, stub)
+			uintFlags = append(uintFlags, flag)
 		case FlagStrSlice:
 			if flag.Default != "" {
 				return fmt.Errorf("error parsing YAML, default value not supported for string slice type %s", flag.Name)
 			}
-			strSliceFlags = append(strSliceFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagStrSlice
 			stub.Name = formatInputUp(flag.Name)
@@ -503,11 +519,11 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				return fmt.Errorf("str slice flag cannot have valid ranges or valid values. pl. fix yaml")
 			}
 			strSliceStubs = append(strSliceStubs, stub)
+			strSliceFlags = append(strSliceFlags, flag)
 		case FlagIntSlice:
 			if flag.Default != "" {
 				return fmt.Errorf("error parsing YAML, default value not supported for int slice type %s", flag.Name)
 			}
-			intSliceFlags = append(intSliceFlags, flag)
 			stub := new(flagStub)
 			stub.Type = FlagIntSlice
 			stub.Name = formatInputUp(flag.Name)
@@ -520,6 +536,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				return fmt.Errorf("int slice flag cannot have valid ranges or valid values. pl. fix yaml")
 			}
 			intSliceStubs = append(intSliceStubs, stub)
+			intSliceFlags = append(intSliceFlags, flag)
 		default:
 			return fmt.Errorf("invalid flag type. Valid types: %s, %s, %s, %s, %s, %s",
 				FlagBool, FlagStr, FlagInt, FlagUint, FlagStrSlice, FlagIntSlice)
@@ -571,6 +588,17 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			if err = writeStringToFile(path, b); err != nil {
 				er(err)
 			}
+		}
+	}
+
+	// dump config file for new command
+	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "config.tmpl")); err != nil {
+		return err
+	} else {
+		if b, err := executeTemplate(string(t), data); err != nil {
+			er(err)
+		} else {
+			configWriter.Write([]byte(b))
 		}
 	}
 
