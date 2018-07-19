@@ -70,13 +70,14 @@ type flagSpec struct {
 }
 
 type flagStub struct {
-	Key         string
-	Name        string
-	VarName     string
-	Type        string
-	Persistent  bool
-	ValidValues []string
-	ValidRange  []string
+	Key          string
+	Name         string
+	OriginalName string
+	VarName      string
+	Type         string
+	Persistent   bool
+	ValidValues  []string
+	ValidRange   []string
 }
 
 // cmdSpec defines an individual command.

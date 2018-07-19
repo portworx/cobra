@@ -383,6 +383,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub := new(flagStub)
 			stub.Type = FlagBool
 			stub.Name = formatInputUp(flag.Name)
+			stub.OriginalName = flag.Name
 			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
@@ -397,6 +398,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub := new(flagStub)
 			stub.Type = FlagStr
 			stub.Name = formatInputUp(flag.Name)
+			stub.OriginalName = flag.Name
 			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
@@ -419,6 +421,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub := new(flagStub)
 			stub.Type = FlagInt
 			stub.Name = formatInputUp(flag.Name)
+			stub.OriginalName = flag.Name
 			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
@@ -464,6 +467,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub := new(flagStub)
 			stub.Type = FlagUint
 			stub.Name = formatInputUp(flag.Name)
+			stub.OriginalName = flag.Name
 			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
@@ -510,6 +514,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub := new(flagStub)
 			stub.Type = FlagStrSlice
 			stub.Name = formatInputUp(flag.Name)
+			stub.OriginalName = flag.Name
 			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
@@ -527,6 +532,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub := new(flagStub)
 			stub.Type = FlagIntSlice
 			stub.Name = formatInputUp(flag.Name)
+			stub.OriginalName = flag.Name
 			stub.Key = flag.Name
 			stub.Persistent = flag.Persistent
 			stub.VarName = fmt.Sprintf("%s%s",
