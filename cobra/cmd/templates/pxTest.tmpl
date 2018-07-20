@@ -1,0 +1,18 @@
+// Test{{.funcInCli}} tests data transport layer of CLI
+func Test{{.funcInCli}}(t *testing.T) {
+    // the value of following env var is checked for length.
+    // so value of true or false or any other non-zero length string has same effect
+    if err := os.Setenv("PXCTL__ENABLE_MOCK", "true"); err != nil {
+		t.Fatal(err)
+	}
+    var command []string;
+    {{- range $key, $value := .execCommands }}
+        command = make([]string, 0, 0);
+        {{- range $k, $v := $value }}
+            command = append(command, "{{$v}}");
+        {{- end -}}
+        if _, err := exec.Command("./pxctl", command...).Output(); err != nil {
+        		t.Fatal(err)
+        }
+    {{- end }}
+}

@@ -65,6 +65,12 @@ var (
 	// symbolWriter wraps symbolBuffer.
 	symbolWriter *bufio.Writer
 
+	// testBuffer stores yaml config file that could be used as input for cli being built.
+	testBuffer bytes.Buffer
+
+	// testWriter wraps configBuffer.
+	testWriter *bufio.Writer
+
 	// typeList simply holds list of declared types are strings
 	typeList []string
 )
@@ -156,10 +162,12 @@ produces boilerplate code for CLI.`,
 		configWriter.Flush()
 		symbolWriter.Flush()
 		structWriter.Flush()
+		testWriter.Flush()
 		f := make(map[string]interface{})
 		f["functions"] = string(commandBuffer.Bytes())
 		f["constants"] = string(symbolBuffer.Bytes())
 		f["structs"] = string(structBuffer.Bytes())
+		f["testFuncs"] = string(testBuffer.Bytes())
 		f["typeList"] = typeList
 
 		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunctions.tmpl")); err != nil {
@@ -188,6 +196,22 @@ produces boilerplate code for CLI.`,
 			}
 		}
 
+		if err := os.MkdirAll("test", 0755); err != nil {
+			return err
+		}
+		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxTests.tmpl")); err != nil {
+			return err
+		} else {
+			if b, err := executeTemplate(string(t), f); err != nil {
+				return err
+			} else {
+				outFile := filepath.Join("test", "pxctl_test.go")
+				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
+					return err
+				}
+			}
+		}
+
 		return ioutil.WriteFile("config.yaml", configBuffer.Bytes(), 0644)
 	},
 }
@@ -208,6 +232,7 @@ func init() {
 	symbolWriter = bufio.NewWriter(&symbolBuffer)
 	structWriter = bufio.NewWriter(&structBuffer)
 	configWriter = bufio.NewWriter(&configBuffer)
+	testWriter = bufio.NewWriter(&testBuffer)
 
 	// init executable path
 	if execPath, err := os.Executable(); err != nil {
@@ -320,6 +345,14 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		data["inputInterface"] = false
 	}
 
+	execCommands := make([][]string, 0, 0)
+	execCommand := strings.Split(strings.TrimLeft(filepath.Join(keyPath, cmd.Name), "/"), "/")
+	execCommands = append(execCommands, execCommand)
+	for _, alias := range cmd.Aliases {
+		execCommand := strings.Split(strings.TrimLeft(filepath.Join(keyPath, alias), "/"), "/")
+		execCommands = append(execCommands, execCommand)
+	}
+
 	keys := strings.Split(strings.Replace(data["keyPath"].(string), "/", "-", -1), "-")
 	execFunc := ""
 	for _, key := range keys {
@@ -361,6 +394,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		flag := flag
 		if flag.Required {
 			flag.Use = "(Required) " + flag.Use
+			for i := range execCommands {
+				execCommands[i] = append(execCommands[i], "--"+flag.Name, "0")
+			}
 		}
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
 			strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
@@ -549,6 +585,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		}
 	}
 
+	data["execCommands"] = execCommands
 	data["boolFlags"] = boolFlags
 	data["intFlags"] = intFlags
 	data["uintFlags"] = uintFlags
@@ -608,18 +645,28 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		}
 	}
 
+	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFlag.tmpl")); err != nil {
+		return err
+	} else {
+		if b, err := executeTemplate(string(t), data); err != nil {
+			er(err)
+		} else {
+			data["flagStubs"] = b
+		}
+	}
+
+	if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxTest.tmpl")); err != nil {
+		return err
+	} else {
+		if b, err := executeTemplate(string(t), data); err != nil {
+			er(err)
+		} else {
+			testWriter.Write([]byte(b))
+		}
+	}
+
 	// dump a stub for exec func if user does not provide one in YAML
 	if len(cmd.Func) == 0 {
-		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFlag.tmpl")); err != nil {
-			return err
-		} else {
-			if b, err := executeTemplate(string(t), data); err != nil {
-				er(err)
-			} else {
-				data["flagStubs"] = b
-			}
-		}
-
 		if t, err := ioutil.ReadFile(filepath.Join(execFolder, "templates", "pxFunction.tmpl")); err != nil {
 			return err
 		} else {
