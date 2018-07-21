@@ -80,6 +80,12 @@ type flagStub struct {
 	ValidRange   []string
 }
 
+// testSpec contains how ut should execute this command and expected error outcome.
+type testSpec struct {
+	CommandArgs    []string `yaml:"command-args"`
+	ExpectedToFail bool     `yaml:"expected-to-fail"`
+}
+
 // cmdSpec defines an individual command.
 type cmdSpec struct {
 	// Name of the command. Use simple names with no whitespaces.
@@ -97,6 +103,14 @@ type cmdSpec struct {
 
 	// Example contains sample CLI snippet showing how to run this command.
 	Example string
+
+	// ArgsRequired ensures arguments are passed.
+	ArgsRequired bool `yaml:"args-required"`
+
+	// Tests contain unit tests for this command.
+	// Default execution is automatically tested so no need to provide such UT's.
+	// Generally speaking only enter corner cases and exceptions here.
+	Tests []testSpec `yaml:"unit-tests"`
 
 	// Func is a registered function that should execute for this command.
 	// For consistency all registered functions are defined in pkg cli in exec.go.

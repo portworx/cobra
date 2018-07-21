@@ -32,6 +32,11 @@ var {{.cmdVarName}}Cmd = &cobra.Command{
 }
 
 func {{.localFunc}}(cmd *cobra.Command, args []string) error {
+    {{ if eq .argsRequired true }}
+        if len(args) == 0 {
+            return fmt.Errorf("{{.cmdName}} command requires at least one argument")
+        }
+    {{ end }}
 	{{ range $key, $value := .boolFlags -}}
 		{{- if eq $value.Persistent true -}}
 			vp.BindPFlag("/global/{{$value.Name}}", cmd.PersistentFlags().Lookup("{{$value.Name}}"));

@@ -339,18 +339,16 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		data["keyPath"] = ""
 	}
 
-	if cmd.InputInterface {
-		data["inputInterface"] = true
-	} else {
-		data["inputInterface"] = false
-	}
+	data["inputInterface"] = cmd.InputInterface
+	data["argsRequired"] = cmd.ArgsRequired
 
-	execCommands := make([][]string, 0, 0)
+	// build standard ut's
+	execCommands := make([]testSpec, 0, 0)
 	execCommand := strings.Split(strings.TrimLeft(filepath.Join(keyPath, cmd.Name), "/"), "/")
-	execCommands = append(execCommands, execCommand)
+	execCommands = append(execCommands, testSpec{CommandArgs: execCommand})
 	for _, alias := range cmd.Aliases {
 		execCommand := strings.Split(strings.TrimLeft(filepath.Join(keyPath, alias), "/"), "/")
-		execCommands = append(execCommands, execCommand)
+		execCommands = append(execCommands, testSpec{CommandArgs: execCommand})
 	}
 
 	keys := strings.Split(strings.Replace(data["keyPath"].(string), "/", "-", -1), "-")
@@ -395,7 +393,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		if flag.Required {
 			flag.Use = "(Required) " + flag.Use
 			for i := range execCommands {
-				execCommands[i] = append(execCommands[i], "--"+flag.Name, "0")
+				execCommands[i].CommandArgs = append(execCommands[i].CommandArgs, "--"+flag.Name, "0")
 			}
 		}
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
@@ -585,6 +583,29 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		}
 	}
 
+	// add argument
+	n := len(execCommands)
+	if cmd.ArgsRequired {
+		execCommands = append(execCommands, execCommands...)
+	}
+
+	if cmd.ArgsRequired {
+		for i := range execCommands {
+			if i < n {
+				execCommands[i].CommandArgs = append(execCommands[i].CommandArgs, "myArg")
+			} else {
+				execCommands[i].ExpectedToFail = true
+			}
+		}
+	}
+
+	for i := range cmd.Tests {
+		execCommand = strings.Split(strings.TrimLeft(filepath.Join(keyPath, cmd.Name), "/"), "/")
+		cmd.Tests[i].CommandArgs = append(execCommand, cmd.Tests[i].CommandArgs...)
+	}
+
+	// now copy user defined ut's
+	execCommands = append(execCommands, cmd.Tests...)
 	data["execCommands"] = execCommands
 	data["boolFlags"] = boolFlags
 	data["intFlags"] = intFlags

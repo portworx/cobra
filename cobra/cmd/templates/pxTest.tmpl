@@ -8,11 +8,17 @@ func Test{{.funcInCli}}(t *testing.T) {
     var command []string;
     {{- range $key, $value := .execCommands }}
         command = make([]string, 0, 0);
-        {{- range $k, $v := $value }}
+        {{- range $k, $v := $value.CommandArgs }}
             command = append(command, "{{$v}}");
         {{- end -}}
+        {{- if eq $value.ExpectedToFail true -}}
+        if _, err := exec.Command("./pxctl", command...).Output(); err == nil {
+        		t.Fatal(fmt.Sprintf("expected command to fail:%v", append([]string{"./pxctl"}, command...)))
+        };
+        {{- else -}}
         if _, err := exec.Command("./pxctl", command...).Output(); err != nil {
         		t.Fatal(err)
-        }
+        };
+        {{- end }}
     {{- end }}
 }
