@@ -59,6 +59,9 @@ type flagSpec struct {
 	// ValidRange is a range of values against which input values will be evaluated.
 	ValidRange []string `yaml:"valid-range"`
 
+	// ValidatorFunc allows execution of custom validator func.
+	ValidatorFunc string `yaml:"validator-func"`
+
 	// Hidden indicates if this flag is hidden from CLI view, but still functional.
 	Hidden bool
 
@@ -70,14 +73,15 @@ type flagSpec struct {
 }
 
 type flagStub struct {
-	Key          string
-	Name         string
-	OriginalName string
-	VarName      string
-	Type         string
-	Persistent   bool
-	ValidValues  []string
-	ValidRange   []string
+	Key           string
+	Name          string
+	OriginalName  string
+	VarName       string
+	Type          string
+	Persistent    bool
+	ValidValues   []string
+	ValidRange    []string
+	ValidatorFunc string
 }
 
 // testSpec contains how ut should execute this command and expected error outcome.

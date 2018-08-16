@@ -19,12 +19,11 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"log"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -423,7 +422,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
-			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 {
+			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 || len(flag.ValidatorFunc) > 0 {
 				return fmt.Errorf("bool flag cannot have validation checks. pl. fix yaml")
 			}
 			boolStubs = append(boolStubs, stub)
@@ -439,6 +438,22 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
 			stub.ValidValues = flag.ValidValues
+			stub.ValidatorFunc = flag.ValidatorFunc
+			validationChecks := 0
+			if len(flag.ValidValues) > 0 {
+				validationChecks += 1
+			}
+			if len(flag.ValidRange) > 0 {
+				validationChecks += 1
+			}
+			if len(flag.ValidatorFunc) > 0 {
+				validationChecks += 1
+			}
+
+			if validationChecks != 1 {
+				fmt.Errorf("please have only one validation method in: %s", flag.Name)
+			}
+
 			if len(flag.ValidRange) > 0 {
 				return fmt.Errorf("str flag cannot have valid ranges. pl. fix yaml")
 			}
@@ -446,6 +461,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			if len(flag.ValidValues) > 0 {
 				flag.Use = fmt.Sprintf("%s (Valid Values: %v)", flag.Use, flag.ValidValues)
 			}
+
 			strStubs = append(strStubs, stub)
 			strFlags = append(strFlags, flag)
 		case FlagInt:
@@ -461,9 +477,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
-			if len(flag.ValidRange) > 0 && len(flag.ValidValues) > 0 {
-				return fmt.Errorf("enter either valid values or valid range, not both")
-			}
+
 			if len(flag.ValidRange) > 0 {
 				if len(flag.ValidRange) != 2 {
 					return fmt.Errorf("range can only contain two values")
@@ -484,6 +498,22 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 
 			stub.ValidValues = flag.ValidValues
 			stub.ValidRange = flag.ValidRange
+			stub.ValidatorFunc = flag.ValidatorFunc
+
+			validationChecks := 0
+			if len(flag.ValidValues) > 0 {
+				validationChecks += 1
+			}
+			if len(flag.ValidRange) > 0 {
+				validationChecks += 1
+			}
+			if len(flag.ValidatorFunc) > 0 {
+				validationChecks += 1
+			}
+
+			if validationChecks != 1 {
+				fmt.Errorf("please have only one validation method in: %s", flag.Name)
+			}
 
 			if len(flag.ValidValues) > 0 {
 				flag.Use = fmt.Sprintf("%s (Valid Values: %v)", flag.Use, flag.ValidValues)
@@ -530,6 +560,22 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 
 			stub.ValidValues = flag.ValidValues
 			stub.ValidRange = flag.ValidRange
+			stub.ValidatorFunc = flag.ValidatorFunc
+
+			validationChecks := 0
+			if len(flag.ValidValues) > 0 {
+				validationChecks += 1
+			}
+			if len(flag.ValidRange) > 0 {
+				validationChecks += 1
+			}
+			if len(flag.ValidatorFunc) > 0 {
+				validationChecks += 1
+			}
+
+			if validationChecks != 1 {
+				fmt.Errorf("please have only one validation method in: %s", flag.Name)
+			}
 
 			if len(flag.ValidValues) > 0 {
 				flag.Use = fmt.Sprintf("%s (Valid Values: %v)", flag.Use, flag.ValidValues)
@@ -554,9 +600,11 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
-			if len(flag.ValidRange) > 0 || len(flag.ValidValues) > 0 {
-				return fmt.Errorf("str slice flag cannot have valid ranges or valid values. pl. fix yaml")
+
+			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 || len(flag.ValidatorFunc) > 0 {
+				fmt.Errorf("validators are not supported in string slice flags: %s", flag.Name)
 			}
+
 			strSliceStubs = append(strSliceStubs, stub)
 			strSliceFlags = append(strSliceFlags, flag)
 		case FlagIntSlice:
@@ -572,9 +620,11 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			stub.VarName = fmt.Sprintf("%s%s",
 				strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 				formatInputUp(flag.Name))
-			if len(flag.ValidRange) > 0 || len(flag.ValidValues) > 0 {
-				return fmt.Errorf("int slice flag cannot have valid ranges or valid values. pl. fix yaml")
+
+			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 || len(flag.ValidatorFunc) > 0 {
+				fmt.Errorf("validators are not supported in string int flags: %s", flag.Name)
 			}
+
 			intSliceStubs = append(intSliceStubs, stub)
 			intSliceFlags = append(intSliceFlags, flag)
 		default:
