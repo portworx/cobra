@@ -451,7 +451,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			}
 
 			if validationChecks != 1 {
-				fmt.Errorf("please have only one validation method in: %s", flag.Name)
+				return fmt.Errorf("please have only one validation method in: %s", flag.Name)
 			}
 
 			if len(flag.ValidRange) > 0 {
@@ -512,7 +512,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			}
 
 			if validationChecks != 1 {
-				fmt.Errorf("please have only one validation method in: %s", flag.Name)
+				return fmt.Errorf("please have only one validation method in: %s", flag.Name)
 			}
 
 			if len(flag.ValidValues) > 0 {
@@ -574,7 +574,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			}
 
 			if validationChecks != 1 {
-				fmt.Errorf("please have only one validation method in: %s", flag.Name)
+				return fmt.Errorf("please have only one validation method in: %s", flag.Name)
 			}
 
 			if len(flag.ValidValues) > 0 {
@@ -602,7 +602,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				formatInputUp(flag.Name))
 
 			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 || len(flag.ValidatorFunc) > 0 {
-				fmt.Errorf("validators are not supported in string slice flags: %s", flag.Name)
+				return fmt.Errorf("validators are not supported in string slice flags: %s", flag.Name)
 			}
 
 			strSliceStubs = append(strSliceStubs, stub)
@@ -622,7 +622,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				formatInputUp(flag.Name))
 
 			if len(flag.ValidValues) > 0 || len(flag.ValidRange) > 0 || len(flag.ValidatorFunc) > 0 {
-				fmt.Errorf("validators are not supported in string int flags: %s", flag.Name)
+				return fmt.Errorf("validators are not supported in string int flags: %s", flag.Name)
 			}
 
 			intSliceStubs = append(intSliceStubs, stub)
