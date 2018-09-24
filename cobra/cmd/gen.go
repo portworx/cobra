@@ -392,7 +392,17 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		if flag.Required {
 			flag.Use = "(Required) " + flag.Use
 			for i := range execCommands {
-				execCommands[i].CommandArgs = append(execCommands[i].CommandArgs, "--"+flag.Name, "0")
+				if len(flag.ValidValues) > 0 {
+					execCommands[i].CommandArgs = append(execCommands[i].CommandArgs,
+						"--"+flag.Name, flag.ValidValues[0])
+				} else if len(flag.ValidRange) > 0 {
+					execCommands[i].CommandArgs = append(execCommands[i].CommandArgs,
+						"--"+flag.Name, flag.ValidRange[0])
+
+				} else {
+					execCommands[i].CommandArgs = append(execCommands[i].CommandArgs,
+						"--"+flag.Name, "0")
+				}
 			}
 		}
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
@@ -450,7 +460,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				validationChecks += 1
 			}
 
-			if validationChecks != 1 {
+			if validationChecks > 1 {
 				return fmt.Errorf("please have only one validation method in: %s", flag.Name)
 			}
 
@@ -511,7 +521,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				validationChecks += 1
 			}
 
-			if validationChecks != 1 {
+			if validationChecks > 1 {
 				return fmt.Errorf("please have only one validation method in: %s", flag.Name)
 			}
 
@@ -573,7 +583,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 				validationChecks += 1
 			}
 
-			if validationChecks != 1 {
+			if validationChecks > 1 {
 				return fmt.Errorf("please have only one validation method in: %s", flag.Name)
 			}
 
