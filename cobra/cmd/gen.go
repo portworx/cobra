@@ -556,6 +556,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			intFlags = append(intFlags, flag)
 		case FlagUint:
 			if flag.Default == "" {
+				flag.Default = "0"
 				logrus.WithField("flag", flag.Name).
 					WithField("command", filepath.Join(keyPath, cmd.Name)).
 					Warn("default is being set to 0")
