@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -157,11 +158,11 @@ produces boilerplate code for CLI.`,
 			}
 		}
 
-		commandWriter.Flush()
-		configWriter.Flush()
-		symbolWriter.Flush()
-		structWriter.Flush()
-		testWriter.Flush()
+		_ = commandWriter.Flush()
+		_ = configWriter.Flush()
+		_ = symbolWriter.Flush()
+		_ = structWriter.Flush()
+		_ = testWriter.Flush()
 		f := make(map[string]interface{})
 		f["functions"] = string(commandBuffer.Bytes())
 		f["constants"] = string(symbolBuffer.Bytes())
@@ -204,7 +205,7 @@ produces boilerplate code for CLI.`,
 			if b, err := executeTemplate(string(t), f); err != nil {
 				return err
 			} else {
-				outFile := filepath.Join("test", "pxctl_test.go")
+				outFile := filepath.Join("test", "auto_pxctl_test.go")
 				if err := ioutil.WriteFile(outFile, []byte(b), 0644); err != nil {
 					return err
 				}
@@ -286,7 +287,7 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 		return err
 	}
 
-	fmt.Fprintln((&cobra.Command{}).OutOrStdout(), cmdName, "created at", cmdPath)
+	_, _ = fmt.Fprintln((&cobra.Command{}).OutOrStdout(), cmdName, "created at", cmdPath)
 
 	// run recursion for subcommands
 	for _, subCmd := range cmd.SubCmd {
@@ -408,7 +409,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		s := fmt.Sprintf("%s%s = \"%s\"\n",
 			strings.Replace(data["localFunc"].(string), "exec", "flag", -1),
 			formatInputUp(flag.Name), flag.Name)
-		symbolWriter.Write([]byte(s))
+		_, _ = symbolWriter.Write([]byte(s))
 		switch flag.Type {
 		case FlagBool:
 			if flag.Default == "" {
@@ -475,8 +476,14 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			strStubs = append(strStubs, stub)
 			strFlags = append(strFlags, flag)
 		case FlagInt:
+			if flag.Default == "" {
+				flag.Default = "0"
+				logrus.WithField("flag", flag.Name).Warn("default is being set to 0")
+			}
 			if _, err := strconv.ParseInt(flag.Default, 10, 32); err != nil {
-				return fmt.Errorf("error parsing YAML, invalid default value for int type %s", flag.Name)
+				return fmt.Errorf(
+					"error parsing YAML, invalid default value for int type %s, err:%v",
+					flag.Name, err)
 			}
 			stub := new(flagStub)
 			stub.Type = FlagInt
@@ -535,8 +542,14 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			intStubs = append(intStubs, stub)
 			intFlags = append(intFlags, flag)
 		case FlagUint:
+			if flag.Default == "" {
+				flag.Default = "0"
+				logrus.WithField("flag", flag.Name).Warn("default is being set to 0")
+			}
 			if _, err := strconv.ParseUint(flag.Default, 10, 32); err != nil {
-				return fmt.Errorf("error parsing YAML, invalid default value for uint type %s", flag.Name)
+				return fmt.Errorf(
+					"error parsing YAML, invalid default value for uint type %s, err:%v",
+					flag.Name, err)
 			}
 			stub := new(flagStub)
 			stub.Type = FlagUint
@@ -688,7 +701,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		if b, err := executeTemplate(string(t), data); err != nil {
 			er(err)
 		} else {
-			structWriter.Write([]byte(b))
+			_, _ = structWriter.Write([]byte(b))
 		}
 	}
 
@@ -722,7 +735,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		if b, err := executeTemplate(string(t), data); err != nil {
 			er(err)
 		} else {
-			configWriter.Write([]byte(b))
+			_, _ = configWriter.Write([]byte(b))
 		}
 	}
 
@@ -742,7 +755,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		if b, err := executeTemplate(string(t), data); err != nil {
 			er(err)
 		} else {
-			testWriter.Write([]byte(b))
+			_, _ = testWriter.Write([]byte(b))
 		}
 	}
 
@@ -754,7 +767,7 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			if b, err := executeTemplate(string(t), data); err != nil {
 				er(err)
 			} else {
-				commandWriter.Write([]byte(b))
+				_, _ = commandWriter.Write([]byte(b))
 			}
 		}
 	}
