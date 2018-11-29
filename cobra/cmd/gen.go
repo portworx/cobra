@@ -266,6 +266,7 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 
 	cmdName := validateCmdName(cmd.Name)
 	commandName := cmdName
+	fileName := commandName
 	// loop till we find a command name that is not taken
 	for i := 0; ; i++ {
 		if _, ok := cmdNames[commandName]; !ok {
@@ -282,7 +283,7 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 	// use the generated name as varName for this command
 	cmd.varName = cmdName
 
-	cmdPath := filepath.Join(project.CmdPath(), "auto_"+cmdName+".go")
+	cmdPath := filepath.Join(project.CmdPath(), generateFileName(keyPath, fileName))
 	if err := createCmdFileWithAdditionalData(project.License(), cmdPath, parent, keyPath, cmd); err != nil {
 		return err
 	}
@@ -297,6 +298,16 @@ func add(parent, keyPath string, cmd *cmdSpec) error {
 		}
 	}
 	return nil
+}
+
+func generateFileName(keyPath, cmdName string) string {
+	keyPath = strings.TrimLeft(keyPath, "/")
+	keyPath = strings.Replace(keyPath, "/", "_", -1)
+	fileName := fmt.Sprintf("%s_%s_%s_%s.%s", "auto", "pxctl", keyPath, cmdName, "go")
+	fileName = strings.TrimSpace(fileName)
+	fileName = strings.Replace(fileName, "__", "_", -1)
+	fileName = strings.Replace(fileName, " ", "", -1)
+	return fileName
 }
 
 func createCmdFileWithAdditionalData(license License, path, parent, keyPath string, cmd *cmdSpec) error {
