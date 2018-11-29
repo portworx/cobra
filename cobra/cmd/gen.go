@@ -489,7 +489,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 		case FlagInt:
 			if flag.Default == "" {
 				flag.Default = "0"
-				logrus.WithField("flag", flag.Name).Warn("default is being set to 0")
+				logrus.WithField("flag", flag.Name).
+					WithField("command", filepath.Join(keyPath, cmd.Name)).
+					Warn("default is being set to 0")
 			}
 			if _, err := strconv.ParseInt(flag.Default, 10, 32); err != nil {
 				return fmt.Errorf(
@@ -554,8 +556,9 @@ func createCmdFileWithAdditionalData(license License, path, parent, keyPath stri
 			intFlags = append(intFlags, flag)
 		case FlagUint:
 			if flag.Default == "" {
-				flag.Default = "0"
-				logrus.WithField("flag", flag.Name).Warn("default is being set to 0")
+				logrus.WithField("flag", flag.Name).
+					WithField("command", filepath.Join(keyPath, cmd.Name)).
+					Warn("default is being set to 0")
 			}
 			if _, err := strconv.ParseUint(flag.Default, 10, 32); err != nil {
 				return fmt.Errorf(
